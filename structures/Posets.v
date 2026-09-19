@@ -55,7 +55,7 @@ Section SUP_PROPERTIES.
   Qed.
 End SUP_PROPERTIES.
 
-(** *** Infrema *)
+(** *** Infima *)
 
 Class IsInf `{PartialOrder} {I} (y : I -> P) (u : P) :=
   {

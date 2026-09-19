@@ -143,15 +143,21 @@ Section OPS.
 
   Lemma join_ub_l x y :
     ref x (join x y).
-  Admitted.
+  Proof.
+    apply (sup_at true). reflexivity.
+  Qed.
 
   Lemma join_ub_r x y :
     ref y (join x y).
-  Admitted.
+  Proof.
+    apply (sup_at false). reflexivity.
+  Qed.
 
   Lemma join_lub x y z :
     ref x z -> ref y z -> ref (join x y) z.
-  Admitted.
+  Proof.
+    intros. apply sup_lub. destruct i; assumption.
+  Qed.
 
   Lemma join_l x y z :
     ref x y ->
