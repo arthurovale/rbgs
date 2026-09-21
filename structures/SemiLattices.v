@@ -17,6 +17,8 @@ Class SemiLattice (L : Type) :=
     lsup_sup {I} (u : I -> L) :> IsSup u (lsup u);
   }.
 
+Global Instance lsup_params : Params (@lsup) 1 := { }.
+
 (** The notations below work well in the context of completely
   distributive monads. *)
 
@@ -226,4 +228,3 @@ Module SLat <: ConcreteCategory.
   Include ConcreteCategoryTheory.
 
 End SLat.
-
