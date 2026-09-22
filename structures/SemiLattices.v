@@ -67,11 +67,11 @@ Section OPS.
 
   (** Least element *)
 
-  Definition bot : L :=
+  Definition lbot : L :=
     sup i : Empty_set, match i with end.
 
-  Lemma bot_lb x :
-    bot <= x.
+  Lemma lbot_lb x :
+    lbot <= x.
   Proof.
     apply sup_lub. intros [ ].
   Qed.
@@ -128,11 +128,11 @@ Section OPS.
 
   (** ** Properties *)
 
-  Lemma join_undef_l x :
-    join bot x = x.
+  Lemma join_lbot_l x :
+    join lbot x = x.
   Proof.
     eapply sup_unique. apply lsup_sup. split.
-    destruct i. apply bot_lb. reflexivity.
+    destruct i. apply lbot_lb. reflexivity.
     intros. exact (H false).
   Qed.
 
@@ -158,8 +158,8 @@ Section OPS.
     reflexivity.
   Qed.
 
-  Lemma bot_lsup :
-    bot = sup i : Empty_set, match i with end.
+  Lemma lbot_lsup :
+    lbot = sup i : Empty_set, match i with end.
   Proof.
     reflexivity.
   Qed.
@@ -168,7 +168,7 @@ Section OPS.
     derived operations, so that relying on their concrete definition
     should not be necessary. *)
 
-  Global Opaque bot join.
+  Global Opaque lbot join.
 
 End OPS.
 
@@ -180,6 +180,24 @@ Class SupContinuous {A B} `{Asl: SemiLattice A} `{Bsl: SemiLattice B} (f : A -> 
     sup_cont {I} (x : I -> A) : f (lsup x) = lsup (fun i => f (x i));
   }.
 
+(** Sup-continuous functions are closed under identity and composition. *)
+
+Global Instance supcont_id `{SemiLattice} :
+  SupContinuous (fun x => x).
+Proof.
+  split. intros I x. reflexivity.
+Qed.
+
+Global Instance supcont_compose {A B C} `{SemiLattice A} `{SemiLattice B} `{SemiLattice C}
+  (g : B -> C) (f : A -> B) :
+  SupContinuous g ->
+  SupContinuous f ->
+  SupContinuous (fun x => g (f x)).
+Proof.
+  intros Hg Hf. split. intros I x.
+  rewrite (sup_cont (f := f)). apply (sup_cont (f := g)).
+Qed.
+
 Lemma supcont_mon {A B} `{Asl: SemiLattice A} `{Bsl: SemiLattice B} (f : A -> B) :
   SupContinuous f -> Monotonic f (ref ++> ref).
 Proof.
@@ -188,11 +206,11 @@ Proof.
 Qed.
 
 Lemma supcont_strict {A B} `{Asl: SemiLattice A} `{Bsl: SemiLattice B} (f : A -> B) :
-  SupContinuous f -> f bot = bot.
+  SupContinuous f -> f lbot = lbot.
 Proof.
-  intros Hf. rewrite bot_lsup. rewrite sup_cont. apply antisymmetry.
+  intros Hf. rewrite lbot_lsup. rewrite sup_cont. apply antisymmetry.
   apply lsup_sup. intros i. destruct i.
-  apply bot_lb.
+  apply lbot_lb.
 Qed.
 
 Module SLat <: ConcreteCategory.
@@ -212,7 +230,7 @@ Module SLat <: ConcreteCategory.
   Global Instance id_mor `{SemiLattice} :
     Morphism (fun x => x).
   Proof.
-    firstorder.
+    typeclasses eauto.
   Qed.
 
   Global Instance compose_mor :
@@ -221,8 +239,7 @@ Module SLat <: ConcreteCategory.
       Morphism f ->
       Morphism (fun x => g (f x)).
   Proof.
-    intros A B C ? ? ? g f Hg Hf. split. intros I x.
-    rewrite (sup_cont (f := f)). apply Hg.
+    typeclasses eauto.
   Qed.
 
   Include ConcreteCategoryTheory.

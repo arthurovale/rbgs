@@ -4,6 +4,7 @@ Require Import interfaces.ConcreteCategory.
 Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.SemiLattices.
+Require Import interfaces.Functor.
 
 Require Import PropExtensionality.
 Require Import FunctionalExtensionality.
@@ -117,8 +118,8 @@ Class DCPOSL (L : Type) :=
 
 Class DCPOSLMorphism {A B} `{Adcposl: DCPOSL A} `{Bdcposl: DCPOSL B} (f : A -> B) :=
   {
-    dcposl_mor_sc :> DCPO.Morphism f;
-    dcposl_mor_sup :> SLat.Morphism f;
+    dcposl_mor_sc :> ScottContinuous true f;
+    dcposl_mor_sup :> SupContinuous f;
   }.
 
 Module DCPOSL <: ConcreteCategory.
@@ -147,9 +148,74 @@ Module DCPOSL <: ConcreteCategory.
       Morphism f ->
       Morphism (fun x => g (f x)).
   Proof.
-    intros; split; typeclasses eauto. 
+    intros; split; typeclasses eauto.
   Qed.
 
   Include ConcreteCategoryTheory.
 
 End DCPOSL.
+
+(* I could define the forgetful functor and use the derived Universal class from 
+  Functor.v but that seems like adding more layers to the onion *)
+
+Class IsFDCPOSL (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} :=
+  {
+    emb : P -> F;
+    emb_sc :> ScottContinuous true emb;
+    ext {D} `{Ddcposl : DCPOSL D} : (P -> D) -> F -> D;
+
+    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} :>
+      DCPOSLMorphism (ext f);
+    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} :
+      forall p, ext f (emb p) = f p;
+    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f}
+      (g : F -> D) `{Hg : !DCPOSLMorphism g} :
+      (forall p, g (emb p) = f p) -> forall x, g x = ext f x;
+  }.
+
+Section EGLI_MILNER_DOMAIN.
+  Context `{DCPO}.
+
+  Definition set := P -> Prop.
+
+  Record le (x y : set) :=
+    {
+      le_fw : forall (a : P), x a -> a <> bot -> exists (b : P) , y b /\ lce a b;
+      le_bw : forall (b : P) , (y b) -> exists (a : P) , (x a) /\ lce a b
+    }.
+
+  Lemma le_div (x y : set) :
+    le x y -> y bot -> x bot.
+  Proof.
+    intros Hle Hybot. destruct Hle as [Hfw Hbw].
+    specialize (Hbw bot Hybot). destruct Hbw as [a [in_x lcea]].
+    pose lce_bot_eq as Heq. specialize (Heq a lcea). rewrite <- Heq. exact in_x.
+  Qed.
+
+  Definition div_set x := x = bot.
+
+  Lemma div_set_bot (x : set) : le div_set x.
+  Proof.
+    split.
+    - intros a in_div_set neq_bot. 
+      unfold div_set in in_div_set. rewrite in_div_set in *.
+      contradiction neq_bot. reflexivity.
+    - intros b in_x. exists bot. split. reflexivity. apply bot_lb.
+  Qed.
+
+  Global Instance le_preo :
+    PreOrder le.
+  Proof.
+    split; split; firstorder.
+    - exists a. split. assumption. reflexivity.
+    - exists b. split. assumption. reflexivity.
+    - specialize (le_fw1 a H2 H3). destruct le_fw1 as [b [in_y lce_a_b]].
+      assert (b_neq_bot: b <> bot). 
+        { intros b_eq_bot. rewrite b_eq_bot in lce_a_b. 
+          apply lce_bot_eq in lce_a_b. contradiction lce_a_b. }
+      specialize (le_fw0 b in_y b_neq_bot). destruct le_fw0 as [c [in_z lce_b_c]].
+      exists c; split. assumption. etransitivity. exact lce_a_b. exact lce_b_c.
+    - specialize (le_bw0 b H2). destruct le_bw0 as [a [in_y lce_a_b]].
+      specialize (le_bw1 a in_y). destruct le_bw1 as [c [in_x lce_c_a]].
+      exists c. split. assumption. etransitivity. apply lce_c_a. apply lce_a_b.
+  Qed.

@@ -123,6 +123,13 @@ Proof.
   apply sup_lub. tauto.
 Qed.
 
+Lemma lce_bot_eq `{DCPO} x :
+  lce x bot -> x = bot.
+Proof.
+  intros Hlce. apply antisymmetry.
+  assumption. apply bot_lb.
+Qed.
+
 (** *** Binary case for [dsup] *)
 
 (** In some proofs below we will need to express ordering
