@@ -192,22 +192,11 @@ Section EGLI_MILNER_DOMAIN.
     apply propositional_extensionality. apply Hxy.
   Qed.
 
-
-  (** *** SemiLattice Structure *)
-
   Definition incl (x y : convex_set) := forall a, x a -> y a. 
 
-  Global Instance incl_po : PartialOrder incl.
-  Proof.
-    split. split; firstorder.
-    intros x y incl_x_y incl_y_x. apply convex_set_ext.
-    firstorder.
-  Qed.
+  (** *** Convex Hull *)
 
-  Global Instance convex_poset : Poset convex_set :=
-  {
-    ref := incl;
-  }.
+  (** The convex hull operator is the smallest convex set including the original set *)
 
   Definition chull_mem (x : P -> Prop) (b : P) := 
     exists a c , x a /\ x c /\ lce a b /\ lce b c.
@@ -227,6 +216,8 @@ Section EGLI_MILNER_DOMAIN.
     mem := chull_mem x;
     convexity := chull_convexity x;
   |}.
+
+  (** The convex hull is a closure operator *)
 
   Lemma chull_extensive (x : P -> Prop) : forall a, x a -> chull x a.
   Proof.
@@ -257,6 +248,21 @@ Section EGLI_MILNER_DOMAIN.
     all: apply incl_x_y; assumption.
   Qed.
 
+  (** *** SemiLattice Structure *)
+ 
+  Global Instance incl_po : PartialOrder incl.
+  Proof.
+    split. split; firstorder.
+    intros x y incl_x_y incl_y_x. apply convex_set_ext.
+    firstorder.
+  Qed.
+
+  Global Instance convex_poset : Poset convex_set :=
+  {
+    ref := incl;
+  }.
+
+
   (* Program Definition convex_sup {I} (x : I -> convex_set) : convex_set :=
     mem c := exists a b, (exists i, x i a) /\ (exists j, x j b) /\ lce a c /\ lce c b;
   |}.
@@ -271,8 +277,6 @@ Global Instance convex_sl : SemiLattice convex_set :=
 Next Obligation.
   (* IsSup (convex_sup x): split into sup_ub and sup_lub *)
 Admitted. *)
-
-
 
   (** *** DCPO Structure *)
 
