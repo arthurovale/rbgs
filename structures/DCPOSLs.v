@@ -246,8 +246,7 @@ Section EGLI_MILNER_DOMAIN.
     - intros Hchull.
       destruct Hchull as [a [c [chull_a [chull_c [lce_a_b lce_b_c]]]]].
       exists a. exists c. repeat (try split); try assumption.
-      all: apply chull_extensive
-      ; assumption.
+      all: apply chull_extensive; assumption.
   Qed.
 
   Lemma chull_mon (x : P -> Prop) (y : P -> Prop) : 
