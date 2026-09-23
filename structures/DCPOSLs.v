@@ -194,6 +194,8 @@ Section EGLI_MILNER_DOMAIN.
 
   Definition incl (x y : convex_set) := forall a, x a -> y a. 
 
+  Definition union {I} (x : I -> (P -> Prop)) (a : P) := exists i, x i a.
+
   (** *** Convex Hull *)
 
   (** The convex hull operator is the smallest convex set including the original set *)
@@ -262,21 +264,21 @@ Section EGLI_MILNER_DOMAIN.
     ref := incl;
   }.
 
+  Definition convex_sup {I} (x : I -> convex_set) : convex_set := chull (union x).
 
-  (* Program Definition convex_sup {I} (x : I -> convex_set) : convex_set :=
-    mem c := exists a b, (exists i, x i a) /\ (exists j, x j b) /\ lce a c /\ lce c b;
-  |}.
-Next Obligation.
-  (* convexity of the hull *)
-Admitted.
-
-Global Instance convex_sl : SemiLattice convex_set :=
-  {
-    lsup I x := convex_sup x;
-  }.
-Next Obligation.
-  (* IsSup (convex_sup x): split into sup_ub and sup_lub *)
-Admitted. *)
+  Global Program Instance convex_sl : SemiLattice convex_set :=
+    {
+      lsup I x := convex_sup x;
+    }.
+  Next Obligation.
+    split.
+    - intros i a in_u_i. apply chull_extensive. exists i. assumption.
+    - intros y incl_u_y b in_csup. 
+      destruct in_csup as [a [c [in_union_a [in_union_c [lce_a_b lce_b_c]]]]].
+      apply (convexity y a b c); auto.
+      destruct in_union_a as [i in_u]. apply (incl_u_y i). assumption.
+      destruct in_union_c as [i in_u]. apply (incl_u_y i). assumption. 
+  Qed.
 
   (** *** DCPO Structure *)
 
@@ -341,7 +343,7 @@ Admitted. *)
     - destruct Hxy as [fw_xy _], Hyx as [_ bw_yx].
       destruct (fw_xy a Hxa Ha) as [b [Hyb Hab]].
       destruct (bw_yx a Hxa) as [c [Hyc Hca]].
-      apply (convexity y c b a); assumption.
+      apply (convexity y c a b); assumption.
   Qed.
 
   Global Instance em_le_antisym :
