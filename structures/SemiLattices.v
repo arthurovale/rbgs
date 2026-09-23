@@ -10,11 +10,11 @@ removing all the data about infs. *)
 
 Class SemiLattice (L : Type) :=
   {
-    cdl_poset :> Poset L;
+    cdl_poset :: Poset L;
 
     lsup : forall {I}, (I -> L) -> L;
 
-    lsup_sup {I} (u : I -> L) :> IsSup u (lsup u);
+    lsup_sup {I} (u : I -> L) :: IsSup u (lsup u);
   }.
 
 Global Instance lsup_params : Params (@lsup) 1 := { }.
@@ -50,7 +50,7 @@ Section PREDICATES.
   Lemma fsup_at {I} (i : I) (P : I -> Prop) (x : L) (y : I -> L) :
     P i -> x <= y i -> x <= fsup P y.
   Proof.
-    intros Hi Hx. etransitivity; eauto using fsup_ub.
+    intros Hi Hx. etransitivity; eauto. apply fsup_ub; auto.
   Qed.
 
   Lemma fsup_lub {I} (P : I -> Prop) (x : I -> L) (y : L) :

@@ -6,12 +6,12 @@ Require Import structures.DCPOs.
 Require Import structures.SemiLattices.
 Require Import interfaces.Functor.
 
-Require Import Program.
-Require Import PropExtensionality.
-Require Import FunctionalExtensionality.
-Require Import Classical.
-Require Import ClassicalChoice.
-Require Import ChoiceFacts.
+Require Import Stdlib.Program.Program.
+Require Import Stdlib.Logic.PropExtensionality.
+Require Import Stdlib.Logic.FunctionalExtensionality.
+Require Import Stdlib.Logic.Classical.
+Require Import Stdlib.Logic.ClassicalChoice.
+Require Import Stdlib.Logic.ChoiceFacts.
 
 
 (** * Dcpo-lattices *)
@@ -66,7 +66,7 @@ Global Hint Extern 5 (KDirected _ (fun i => ?f (?x i))) =>
 
 Class KContinuous (K : Type) {A B} `{Adcpo: DCPO A} `{Bdcpo: DCPO B} (f: A -> B) :=
   {
-    kc_lce :> Monotonic f (lce ++> lce);
+    kc_lce :: Monotonic f (lce ++> lce);
     kc_lub {I} (x: I -> A) `{Dx: !Directed x} `{Kx: !KDirected (R := lce) K x} y:
       (forall i, lce (f (x i)) y) -> lce (f (dsup x)) y;
   }.
@@ -92,12 +92,12 @@ Class KContinuous (K : Type) {A B} `{Adcpo: DCPO A} `{Bdcpo: DCPO B} (f: A -> B)
 
 Class DCPOSL (L : Type) :=
   {
-    dcposl_dcpo :> DCPO L;
-    dcposl_sl :> SemiLattice L;
+    dcposl_dcpo :: DCPO L;
+    dcposl_sl :: SemiLattice L;
     (** 
       Naively, one might expect that the join be a Scott-continuous function:
       `
-        sup_dsup {I} :> ScottContinuous true (lsup (L := L) (I := I));
+        sup_dsup {I} :: ScottContinuous true (lsup (L := L) (I := I));
       `
       However, while this is reasonable to expect from finitary joins, it 
       is no longer true once we want to compute countable joins.
@@ -114,13 +114,13 @@ Class DCPOSL (L : Type) :=
       
       Instead, we request that λ-joins be λ-continuous.
     **)
-    sup_kcont {K} :> KContinuous K (lsup (L := L) (I := K));
+    sup_kcont {K} :: KContinuous K (lsup (L := L) (I := K));
   }.
 
 Class DCPOSLMorphism {A B} `{Adcposl: DCPOSL A} `{Bdcposl: DCPOSL B} (f : A -> B) :=
   {
-    dcposl_mor_sc :> ScottContinuous true f;
-    dcposl_mor_sup :> SupContinuous f;
+    dcposl_mor_sc :: ScottContinuous true f;
+    dcposl_mor_sup :: SupContinuous f;
   }.
 
 Module DCPOSL <: ConcreteCategory.
@@ -162,10 +162,10 @@ End DCPOSL.
 Class IsFDCPOSL (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} :=
   {
     emb : P -> F;
-    emb_sc :> ScottContinuous true emb;
+    emb_sc :: ScottContinuous true emb;
     ext {D} `{Ddcposl : DCPOSL D} : (P -> D) -> F -> D;
 
-    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} :>
+    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} ::
       DCPOSLMorphism (ext f);
     ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} :
       forall p, ext f (emb p) = f p;
@@ -180,14 +180,100 @@ Section EGLI_MILNER_DOMAIN.
   Record convex_set :=
     {
       mem :> P -> Prop;
-      convexity : forall a b c, mem a -> mem b -> lce a c -> lce c b -> mem c;
+      convexity : forall a b c, mem a -> mem c -> lce a b -> lce b c -> mem b;
     }.
+
+  Lemma convex_set_ext (x y : convex_set) :
+    (forall a, x a <-> y a) -> x = y.
+  Proof.
+    intros Hxy. destruct x as [x Hx], y as [y Hy]. cbn in *.
+    cut (x = y). { intro. subst. f_equal. apply proof_irrelevance. }
+    apply functional_extensionality. intro a.
+    apply propositional_extensionality. apply Hxy.
+  Qed.
+
 
   (** *** SemiLattice Structure *)
 
   Definition incl (x y : convex_set) := forall a, x a -> y a. 
 
-  
+  Global Instance incl_po : PartialOrder incl.
+  Proof.
+    split. split; firstorder.
+    intros x y incl_x_y incl_y_x. apply convex_set_ext.
+    firstorder.
+  Qed.
+
+  Global Instance convex_poset : Poset convex_set :=
+  {
+    ref := incl;
+  }.
+
+  Definition chull_mem (x : P -> Prop) (b : P) := 
+    exists a c , x a /\ x c /\ lce a b /\ lce b c.
+
+  Lemma chull_convexity (x : P -> Prop) : 
+    forall a b c, chull_mem x a -> chull_mem x c -> lce a b -> lce b c -> chull_mem x b.
+  Proof.
+    intros a b c mem_a mem_c lce_a_b lce_b_c.
+    destruct mem_a as [a' [a'' [in_x_a' [in_x_a'' [lce_a'_a lce_a_a'']]]]].
+    destruct mem_c as [c' [c'' [in_x_c' [in_x_c'' [lce_c'_c lce_c_c'']]]]].
+    exists a'. exists c''. repeat (try split); try assumption.
+    transitivity a; assumption. transitivity c; assumption.
+  Qed.
+
+  Definition chull (x : P -> Prop) : convex_set := 
+  {|
+    mem := chull_mem x;
+    convexity := chull_convexity x;
+  |}.
+
+  Lemma chull_extensive (x : P -> Prop) : forall a, x a -> chull x a.
+  Proof.
+    intros a in_x. 
+    exists a. exists a. repeat (try split); try assumption; try reflexivity.
+  Qed.
+
+  Lemma chull_idem (x : P -> Prop) : chull (chull x) = chull x.
+  Proof.
+    apply convex_set_ext. intros b; split.
+    - intros Hchull. 
+      destruct Hchull as [a [c [chull_a [chull_c [lce_a_b lce_b_c]]]]].
+      destruct chull_a as [a' [a'' [chull_a' [chull_a'' [lce_a'_a lce_a_a'']]]]].
+      destruct chull_c as [c' [c'' [chull_c' [chull_c'' [lce_c'_a lce_a_c'']]]]].
+      exists a'. exists c''.  repeat (try split); try assumption.
+      transitivity a; assumption. transitivity c; assumption.
+    - intros Hchull.
+      destruct Hchull as [a [c [chull_a [chull_c [lce_a_b lce_b_c]]]]].
+      exists a. exists c. repeat (try split); try assumption.
+      all: apply chull_extensive
+      ; assumption.
+  Qed.
+
+  Lemma chull_mon (x : P -> Prop) (y : P -> Prop) : 
+    (forall a, x a -> y a) -> incl (chull x) (chull y).
+  Proof.
+    intros incl_x_y. intros b [a [c [in_x_a [in_x_c [lce_a_b lce_b_c]]]]]. 
+    exists a. exists c. repeat (try split); try assumption.
+    all: apply incl_x_y; assumption.
+  Qed.
+
+  (* Program Definition convex_sup {I} (x : I -> convex_set) : convex_set :=
+    mem c := exists a b, (exists i, x i a) /\ (exists j, x j b) /\ lce a c /\ lce c b;
+  |}.
+Next Obligation.
+  (* convexity of the hull *)
+Admitted.
+
+Global Instance convex_sl : SemiLattice convex_set :=
+  {
+    lsup I x := convex_sup x;
+  }.
+Next Obligation.
+  (* IsSup (convex_sup x): split into sup_ub and sup_lub *)
+Admitted. *)
+
+
 
   (** *** DCPO Structure *)
 
@@ -241,15 +327,6 @@ Section EGLI_MILNER_DOMAIN.
       specialize (bw_y_z c in_z). destruct bw_y_z as [b [in_y lce_b_c]].
       specialize (bw_x_y b in_y). destruct bw_x_y as [a [in_x lce_a_b]].
       exists a. split. assumption. transitivity b; assumption.
-  Qed.
-
-  Lemma convex_set_ext (x y : convex_set) :
-    (forall a, x a <-> y a) -> x = y.
-  Proof.
-    intros Hxy. destruct x as [x Hx], y as [y Hy]. cbn in *.
-    cut (x = y). { intro. subst. f_equal. apply proof_irrelevance. }
-    apply functional_extensionality. intro a.
-    apply propositional_extensionality. apply Hxy.
   Qed.
 
   Lemma em_le_incl (x y : convex_set) :
