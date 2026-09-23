@@ -6,6 +6,7 @@ Require Import structures.DCPOs.
 Require Import structures.SemiLattices.
 Require Import interfaces.Functor.
 
+Require Import Program.
 Require Import PropExtensionality.
 Require Import FunctionalExtensionality.
 Require Import Classical.
@@ -45,7 +46,7 @@ Qed.
 Global Hint Extern 1 (KDirected _) =>
   eapply @pair_kdirected; assumption : typeclass_instances.
 
-(** *** Image through a monotonic function *)
+(** Image through a monotonic function *)
 
 Lemma kdirected_apply {P Q R S} {K} (f : P -> Q) {I} (x : I -> P) :
   forall HR : @PartialOrder P R,
@@ -174,27 +175,47 @@ Class IsFDCPOSL (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} :=
   }.
 
 Section EGLI_MILNER_DOMAIN.
-  Context `{DCPO}.
+  Context `{DCPO}.    
 
-  Definition set := P -> Prop.
-
-  Record le (x y : set) :=
+  Record convex_set :=
     {
-      le_fw : forall (a : P), x a -> a <> bot -> exists (b : P) , y b /\ lce a b;
-      le_bw : forall (b : P) , (y b) -> exists (a : P) , (x a) /\ lce a b
+      mem :> P -> Prop;
+      convexity : forall a b c, mem a -> mem b -> lce a c -> lce c b -> mem c;
     }.
 
-  Lemma le_div (x y : set) :
-    le x y -> y bot -> x bot.
+  (** *** SemiLattice Structure *)
+
+  Definition incl (x y : convex_set) := forall a, x a -> y a. 
+
+  
+
+  (** *** DCPO Structure *)
+
+  (** *** Candidate DCPO Structure *)
+
+  Record em_le (x y : convex_set) :=
+    {
+      em_le_fw : forall (a : P), x a -> a <> bot -> exists (b : P) , y b /\ lce a b;
+      em_le_bw : forall (b : P) , y b -> exists (a : P) , x a /\ lce a b
+    }.
+
+  Lemma le_div (x y : convex_set) :
+    em_le x y -> y bot -> x bot.
   Proof.
     intros Hle Hybot. destruct Hle as [Hfw Hbw].
     specialize (Hbw bot Hybot). destruct Hbw as [a [in_x lcea]].
     pose lce_bot_eq as Heq. specialize (Heq a lcea). rewrite <- Heq. exact in_x.
   Qed.
 
-  Definition div_set x := x = bot.
+  Program Definition div_set := 
+  {|
+    mem x := x = bot;
+  |}.
+  Next Obligation.
+    apply lce_bot_eq; assumption.
+  Defined.
 
-  Lemma div_set_bot (x : set) : le div_set x.
+  Lemma div_set_bot (x : convex_set) : em_le div_set x.
   Proof.
     split.
     - intros a in_div_set neq_bot. 
@@ -204,18 +225,55 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 
   Global Instance le_preo :
-    PreOrder le.
+    PreOrder em_le.
   Proof.
-    split; split; firstorder.
-    - exists a. split. assumption. reflexivity.
-    - exists b. split. assumption. reflexivity.
-    - specialize (le_fw1 a H2 H3). destruct le_fw1 as [b [in_y lce_a_b]].
+    split; split.
+    - intros a ? ?. exists a. split. assumption. reflexivity.
+    - intros a ?. exists a. split. assumption. reflexivity.
+    - intros a in_x neq_bot. destruct H0 as [fw_x_y _]. destruct H1 as [fw_y_z _].
+      specialize (fw_x_y a in_x neq_bot). destruct fw_x_y as [b [in_y lce_a_b]].
       assert (b_neq_bot: b <> bot). 
         { intros b_eq_bot. rewrite b_eq_bot in lce_a_b. 
           apply lce_bot_eq in lce_a_b. contradiction lce_a_b. }
-      specialize (le_fw0 b in_y b_neq_bot). destruct le_fw0 as [c [in_z lce_b_c]].
+      specialize (fw_y_z b in_y b_neq_bot). destruct fw_y_z as [c [in_z lce_b_c]].
       exists c; split. assumption. etransitivity. exact lce_a_b. exact lce_b_c.
-    - specialize (le_bw0 b H2). destruct le_bw0 as [a [in_y lce_a_b]].
-      specialize (le_bw1 a in_y). destruct le_bw1 as [c [in_x lce_c_a]].
-      exists c. split. assumption. etransitivity. apply lce_c_a. apply lce_a_b.
+    - intros c in_z. destruct H0 as [_ bw_x_y]. destruct H1 as [_ bw_y_z]. 
+      specialize (bw_y_z c in_z). destruct bw_y_z as [b [in_y lce_b_c]].
+      specialize (bw_x_y b in_y). destruct bw_x_y as [a [in_x lce_a_b]].
+      exists a. split. assumption. transitivity b; assumption.
+  Qed.
+
+  Lemma convex_set_ext (x y : convex_set) :
+    (forall a, x a <-> y a) -> x = y.
+  Proof.
+    intros Hxy. destruct x as [x Hx], y as [y Hy]. cbn in *.
+    cut (x = y). { intro. subst. f_equal. apply proof_irrelevance. }
+    apply functional_extensionality. intro a.
+    apply propositional_extensionality. apply Hxy.
+  Qed.
+
+  Lemma em_le_incl (x y : convex_set) :
+    em_le x y -> em_le y x -> forall a, x a -> y a.
+  Proof.
+    intros Hxy Hyx a Hxa.
+    destruct (classic (a = bot)) as [-> | Ha].
+    - apply (le_div y x Hyx Hxa).
+    - destruct Hxy as [fw_xy _], Hyx as [_ bw_yx].
+      destruct (fw_xy a Hxa Ha) as [b [Hyb Hab]].
+      destruct (bw_yx a Hxa) as [c [Hyc Hca]].
+      apply (convexity y c b a); assumption.
+  Qed.
+
+  Global Instance em_le_antisym :
+    Antisymmetric _ eq em_le.
+  Proof.
+    intros x y le_x_y le_y_x. 
+    apply convex_set_ext. 
+    intros a; split; apply em_le_incl; assumption.
+  Qed.
+
+  Global Instance em_le_po :
+    PartialOrder em_le.
+  Proof.
+    split; typeclasses eauto.
   Qed.
