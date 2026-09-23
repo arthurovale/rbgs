@@ -1,4 +1,4 @@
-Require Import LogicalRelations.
+Require Import coqrel.LogicalRelations.
 Require Import interfaces.Category.
 Require Import interfaces.ConcreteCategory.
 Require Import structures.Posets.
