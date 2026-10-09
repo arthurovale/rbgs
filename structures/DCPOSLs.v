@@ -394,9 +394,7 @@ Section EGLI_MILNER_DOMAIN.
     - intros a ?. exists a. split. assumption. reflexivity.
     - intros a in_x neq_bot. destruct H0 as [fw_x_y _]. destruct H1 as [fw_y_z _].
       specialize (fw_x_y a in_x neq_bot). destruct fw_x_y as [b [in_y lce_a_b]].
-      assert (b_neq_bot: b <> bot). 
-        { intros b_eq_bot. rewrite b_eq_bot in lce_a_b. 
-          apply lce_bot_eq in lce_a_b. contradiction lce_a_b. }
+      pose proof (lce_bot_neq a b lce_a_b neq_bot) as b_neq_bot.
       specialize (fw_y_z b in_y b_neq_bot). destruct fw_y_z as [c [in_z lce_b_c]].
       exists c; split. assumption. etransitivity. exact lce_a_b. exact lce_b_c.
     - intros c in_z. destruct H0 as [_ bw_x_y]. destruct H1 as [_ bw_y_z]. 
@@ -445,8 +443,7 @@ Section EGLI_MILNER_DOMAIN.
     split. 
     - intros ->. apply Ha_bot. apply lce_bot_eq. assumption.
     - intros b_neq_bot.
-      assert (c_neq_bot : c <> bot).
-      { intros ->. apply b_neq_bot, lce_bot_eq. assumption. }
+      pose proof (lce_bot_neq b c lce_b_c b_neq_bot) as c_neq_bot.
       destruct (Hc c_neq_bot) as [j Hj].
       destruct (classic (a = bot)) as [-> | a_neq_bot].
       + (* bot is in every x i *)
@@ -510,8 +507,7 @@ Section EGLI_MILNER_DOMAIN.
       destruct binS as [ib [em_le_i_ib [in_x_ib lce_a_b]]].
       exists b. split.
       (* since b is above a which is assumed not bot b must not be bot *)
-      assert (b_neq_bot: b <> bot).
-      { intros Heq. apply neq_bot. apply lce_bot_eq. subst; assumption. }
+      pose proof (lce_bot_neq a b lce_a_b neq_bot) as b_neq_bot.
       (* The key part of the proof is now showing that for any stage after ib
          b will be ther. This can be shown by the forward condition em_le (x ib) (x j)
          since any b' given by it satisfies the definition of S and by maximality
@@ -591,3 +587,55 @@ Section EGLI_MILNER_DOMAIN.
         contradiction.
   Qed.
 
+  Global Program Instance em_dcposl `{!Finitary (R := lce)} : DCPOSL convex_set :=
+  {|
+    dcposl_dcpo := em_dcpo;
+    dcposl_sl := convex_sl;
+  |}.
+  Next Obligation.
+    split.
+    (* Montonic Join *)
+    {
+    intros s s' s_lce. split.
+    - intros b csup_s_b neq_bot.
+      destruct csup_s_b as [a [c [a_in_union [c_in_union [lce_a_b lce_b_c]]]]].
+      destruct a_in_union as [xa a_in_s]. destruct c_in_union as [xc c_in_s].
+      destruct (s_lce xc) as [s_lce_fw s_lce_bw].
+      pose proof (lce_bot_neq b c lce_b_c neq_bot) as c_neq_bot.
+      destruct (s_lce_fw c c_in_s c_neq_bot) as [c' [c'_in_s lce_c_c']].
+      exists c'. split.
+      apply chull_extensive. exists xc. assumption.
+      transitivity c; assumption.
+    - intros b' csup_s_b'. 
+      destruct csup_s_b' as [a' [c' [a'_in_union [c'_in_union [lce_a'_b' lce_b'_c']]]]].
+      destruct a'_in_union as [xa' a'_in_s']. destruct (s_lce xa') as [lce_fw lce_bw].
+      destruct (lce_bw a' a'_in_s') as [a [a_in_s lce_a_a']].
+      exists a. split.
+      apply chull_extensive. exists xa'. assumption.
+      transitivity a'; assumption.
+    }
+    (* Continuity *)
+    intros I x Dx KDx y lce_x_y. split.
+    - intros b csup_dsup_x_b b_neq_bot.
+      destruct csup_dsup_x_b as [a [c [a_in_union [c_in_union [lce_a_b lce_b_c]]]]].
+      destruct c_in_union as [kc c_in_x].
+      pose proof (lce_bot_neq b c lce_b_c b_neq_bot) as c_neq_bot.
+      destruct c_in_x as [_ c_in_x]. specialize (c_in_x c_neq_bot). 
+      destruct c_in_x as [ic c_in_x]. specialize (lce_x_y ic).
+      destruct lce_x_y as [lce_x_y_fw _].
+      assert (c_in_csup: convex_sup (x ic) c).
+      { apply chull_extensive. exists kc. apply c_in_x. reflexivity. }
+      specialize (lce_x_y_fw c c_in_csup c_neq_bot).
+      destruct lce_x_y_fw as [c' [c'_in_y lce_c_c']].
+      exists c'. split. assumption. transitivity c; assumption.
+    - destruct (classic (inhabited I)) as [[i] | Hinh].
+      + admit.
+      + intros b b_in_y. destruct (classic (inhabited K)) as [[k] | Kempt].
+        * exists bot. split. apply chull_extensive.
+          exists k. simpl. unfold dsup_em_mem.
+          split. intros. contradiction Hinh. split. exact i.
+          contradiction. apply bot_lb.
+        * exfalso.
+          destruct (KDx (fun k => False_rect I (Kempt (inhabits k)))) as [u _].
+          apply Hinh. exact (inhabits u).
+  Admitted.

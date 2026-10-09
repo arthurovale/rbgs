@@ -130,6 +130,13 @@ Proof.
   assumption. apply bot_lb.
 Qed.
 
+Lemma lce_bot_neq `{DCPO} x y :
+  lce x y -> x <> bot -> y <> bot.
+Proof.
+  intros lce_x_y neq_bot y_eq.
+  apply neq_bot. apply lce_bot_eq. rewrite <- y_eq. assumption.
+Qed. 
+
 (** *** Binary case for [dsup] *)
 
 (** In some proofs below we will need to express ordering
