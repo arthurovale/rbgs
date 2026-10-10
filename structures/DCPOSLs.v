@@ -484,6 +484,26 @@ Section EGLI_MILNER_DOMAIN.
         * exact (Hi1 j Hj a' Hin Ha'b).
   Qed.
 
+  Lemma cofinal_always_eventually_present {I} (x : I -> convex_set) 
+   `{!Directed x} `{inhabited I} (a : P) :
+    a <> bot ->
+    (forall i, exists j, em_le (x i) (x j) /\ x j a) ->
+    exists i, forall j, em_le (x i) (x j) -> x j a.
+  Proof.
+    intros H_neq_bot Hcof. destruct inhabited0 as [i0].
+    destruct (Hcof i0) as [i [em_le_i0_i  a_in_i]].
+    exists i. intros j Hij.
+    destruct (Hcof j) as [k [Hjk Hk]].
+    destruct (em_le_fw _ _ Hij a a_in_i H_neq_bot) as [e [Hje Hae]].
+    destruct (em_le_bw _ _ Hjk a Hk) as [d [Hjd Hda]].
+    apply (convexity (x j) d a e); assumption.
+  Qed.
+
+  (* Unfortunately, whether this notion of powerdomain 
+    is in fact a DCPOSL is quite subtle *)
+  (* So instead, we show that under the condtion that the DCPO is finitary 
+    it is so. *)
+  
   Global Program Instance em_dcpo `{!Finitary (R := lce)} : DCPO convex_set := 
   {|
     lce := em_le;
@@ -572,15 +592,11 @@ Section EGLI_MILNER_DOMAIN.
           destruct (y_bw b in_y) as [a [Hia Hab]].
           exact (Hi i (reflexivity _) a (proj1 (Hl a) Hab) Hab Hia). }
         destruct Hcof as [a [Hab Hcof]].
-        (* This a is the a we need, as can be shown using convenxity *)
+        (* This a is the a we need, as can be shown using convexity *)
         exists a. split; [split | assumption].
         { intros -> i. destruct (Hcof i) as [j [Hij Hj]]. exact (le_div _ _ Hij Hj). }
-        intros Ha. destruct Hinh as [i0]. destruct (Hcof i0) as [i [_ Hi]].
-        exists i. intros j Hij.
-        destruct (Hcof j) as [k [Hjk Hk]].
-        destruct (em_le_fw _ _ Hij a Hi Ha) as [e [Hje Hae]].
-        destruct (em_le_bw _ _ Hjk a Hk) as [d [Hjd Hda]].
-        apply (convexity (x j) d a e); assumption.
+        intros Ha. 
+        apply cofinal_always_eventually_present; assumption.
         (* If I is empty then the sup is just bot *)
         exists bot. split; [split | apply bot_lb].
         intros _ i. exfalso. apply Hempty. exact (inhabits i).
@@ -597,45 +613,119 @@ Section EGLI_MILNER_DOMAIN.
     (* Montonic Join *)
     {
     intros s s' s_lce. split.
+    (* forward *)
     - intros b csup_s_b neq_bot.
+      (* given b in convex_sup s it follows 
+        it is between a and c in the union of all s*)
       destruct csup_s_b as [a [c [a_in_union [c_in_union [lce_a_b lce_b_c]]]]].
-      destruct a_in_union as [xa a_in_s]. destruct c_in_union as [xc c_in_s].
-      destruct (s_lce xc) as [s_lce_fw s_lce_bw].
+      (* in particular c is in s at some kc *)
+      destruct c_in_union as [kc c_in_s].
+      (* since c is above b which is non-bot it follows c is non-bot *)
       pose proof (lce_bot_neq b c lce_b_c neq_bot) as c_neq_bot.
+      (* now we can take the forward direction of lce s s' at kc *)
+      destruct (s_lce kc) as [s_lce_fw s_lce_bw].
       destruct (s_lce_fw c c_in_s c_neq_bot) as [c' [c'_in_s lce_c_c']].
+      (* which gives our witness c' in convex_sup s' *)
       exists c'. split.
-      apply chull_extensive. exists xc. assumption.
+      apply chull_extensive. exists kc. assumption.
       transitivity c; assumption.
-    - intros b' csup_s_b'. 
+    (* backward *)
+    - intros b' csup_s_b'.
+      (* again, for b' in convex_sup s' it lies between a' and c' in union s' *)
       destruct csup_s_b' as [a' [c' [a'_in_union [c'_in_union [lce_a'_b' lce_b'_c']]]]].
-      destruct a'_in_union as [xa' a'_in_s']. destruct (s_lce xa') as [lce_fw lce_bw].
+      (* we find ka' such that a' is in s' at ka' *)
+      destruct a'_in_union as [ka' a'_in_s'].
+      (* we can then use the backward direction of lce s s' to find our witness a' *)
+      destruct (s_lce ka') as [lce_fw lce_bw].
       destruct (lce_bw a' a'_in_s') as [a [a_in_s lce_a_a']].
       exists a. split.
-      apply chull_extensive. exists xa'. assumption.
+      apply chull_extensive. exists ka'. assumption.
       transitivity a'; assumption.
     }
     (* Continuity *)
     intros I x Dx KDx y lce_x_y. split.
+    (* forward *)
     - intros b csup_dsup_x_b b_neq_bot.
+      (* since b is in the convex sup it lies between a and c in the union of the dsup *)
       destruct csup_dsup_x_b as [a [c [a_in_union [c_in_union [lce_a_b lce_b_c]]]]].
+      (* so c must be in dsup at some kc *)
       destruct c_in_union as [kc c_in_x].
+      (* since c is above b <> bot it is itself not bot *)
       pose proof (lce_bot_neq b c lce_b_c b_neq_bot) as c_neq_bot.
+      (* by definition of dsup there is a an ic that witnesses the membership 
+        of c x kc at ic *)
       destruct c_in_x as [_ c_in_x]. specialize (c_in_x c_neq_bot). 
-      destruct c_in_x as [ic c_in_x]. specialize (lce_x_y ic).
-      destruct lce_x_y as [lce_x_y_fw _].
+      destruct c_in_x as [ic c_in_x]. 
       assert (c_in_csup: convex_sup (x ic) c).
       { apply chull_extensive. exists kc. apply c_in_x. reflexivity. }
+      (* note that in particular `c` is the convex union of `x ic` *)      
+      specialize (lce_x_y ic).
+      (* we take the foward direction at stage `ic` which gives us our witness *)
+      destruct lce_x_y as [lce_x_y_fw _].
       specialize (lce_x_y_fw c c_in_csup c_neq_bot).
       destruct lce_x_y_fw as [c' [c'_in_y lce_c_c']].
       exists c'. split. assumption. transitivity c; assumption.
-    - destruct (classic (inhabited I)) as [[i] | Hinh].
-      + admit.
-      + intros b b_in_y. destruct (classic (inhabited K)) as [[k] | Kempt].
-        * exists bot. split. apply chull_extensive.
+    - (* backward *)
+      (* this the meat of the proof *)
+      (* we first split into whether I is inhabited *)
+      destruct (classic (inhabited I)) as [Hinh | Hemp].
+      + intros b b_in_y. destruct (finitary b) as [l Hl].
+        assert (Dxk : forall k, Directed (fun i => x i k)).
+        { 
+          intros k i1 i2. destruct (Dx i1 i2) as [i3 [H1 H2]].
+          exists i3. split; [exact (H1 k) | exact (H2 k)].
+        }
+        assert (Hcof : exists k a, lce a b /\
+          forall i, exists j, em_le (x i k) (x j k) /\ x j k a).
+        {
+          apply NNPP. intros Hno.
+          assert (Hev_abs: forall k, forall a : P, In a l -> lce a b -> exists i : I, forall j : I, em_le (x i k) (x j k) -> ~ x j k a).
+          {
+            intros k a a_in_l lce_a_b. apply NNPP. intros Hno'.
+            apply Hno. exists k. exists a. split. assumption.
+            intros i. apply NNPP. intros Hno''. apply Hno'.
+            exists i. intros j Hij Hja. apply Hno''.
+            exists j. split; assumption.
+          }
+          assert (Hthr : forall k, exists i, forall j, em_le (x i k) (x j k) ->
+                          forall a, In a l -> lce a b -> ~ x j k a).
+          {
+            intros k.
+            apply (eventually_absent_all (fun i => x i k) (inhabited0 := Hinh) b l).
+            apply Hev_abs. 
+          }
+          destruct (choice _ Hthr) as [f Hf]. destruct (KDx f) as [u Hu].
+          destruct (lce_x_y u) as [_ lce_x_y_bw].
+          destruct (lce_x_y_bw b b_in_y) as [b' [b'_in_csup lce_b'_b]].
+          destruct b'_in_csup as [a [c [a_in_union [_ [lce_a_b' _]]]]].
+          destruct a_in_union as [k a_in_x].
+          specialize (Hf k u (Hu k k) a). apply Hf.
+          apply Hl. 1, 2: transitivity b'; assumption. assumption.
+        }
+        destruct Hcof as [k [a [lce_a_b Hcof]]].
+        exists a. split; [| assumption]. apply chull_extensive.
+        exists k. split.
+        * intros -> i. specialize (Hcof i).
+          destruct Hcof as [j [em_le_i_j in_x]].
+          apply (le_div (x i k) (x j k)); assumption.
+        * intros a_neq_bot. apply cofinal_always_eventually_present; try assumption.
+          apply (Dxk k).
+      + (* if it is empty we further consider whether K is inhabited *)
+        intros b b_in_y. destruct (classic (inhabited K)) as [[k] | Kempt].
+        * (* if it is then the convex union is not degenerate *)
+          (* so the dsup is empty and evaluates to div_set at every stage *)
+          (* hence every stage has bot *)
+          exists bot. split. apply chull_extensive.
           exists k. simpl. unfold dsup_em_mem.
-          split. intros. contradiction Hinh. split. exact i.
+          split. intros. contradiction Hemp. split. exact i.
           contradiction. apply bot_lb.
-        * exfalso.
+        * (* otherwise every convex union is the empty set so we derive a 
+          contradiction from directedness. *)
+          exfalso.
+          (* indeed, we construct the empty family in x *)
           destruct (KDx (fun k => False_rect I (Kempt (inhabits k)))) as [u _].
-          apply Hinh. exact (inhabits u).
-  Admitted.
+          (* directedness guarantees an upper bound over I which contradicts 
+          that i is uninhabited *)
+          apply Hemp. exact (inhabits u).
+  Qed.
+End EGLI_MILNER_DOMAIN.
