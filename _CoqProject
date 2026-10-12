@@ -40,4 +40,4 @@ structures/Posets.v
 structures/SemiLattices.v
 structures/Lattices.v
 structures/DCPOs.v
-#structures/DCPOSLs.v
+structures/DCPOSLs.v

@@ -422,6 +422,23 @@ Global Hint Extern 2 (IsSup _ (?f ?a)) =>
 Global Hint Extern 2 (Directed (fun i => _)) =>
   eapply @sc_directed : typeclass_instances.
 
+(** *** Strictness *)
+
+(** A strict Scott-continuous function sends [bot] to the least element,
+  since [bot] is the supremum of the empty family. *)
+
+Lemma sc_bot_lb `{ScottContinuous true} y :
+  lce (f bot) y.
+Proof.
+  apply (sc_lub (Empty_set_rect _)). intros [].
+Qed.
+
+Lemma sc_bot `{ScottContinuous true} :
+  f bot = bot.
+Proof.
+  apply (antisymmetry (R := lce)); [apply sc_bot_lb | apply bot_lb].
+Qed.
+
 (** *** Composition *)
 
 Global Instance sc_id `{Adcpo : DCPO} strict :
