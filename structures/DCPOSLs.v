@@ -1191,7 +1191,9 @@ End EM_DOMAIN_FREE.
 
 (** We parametrize by the two facts that are are required to make the EM domain a 
   DCPOSL: [dsup_em] is the supremum for [em_le], and the join
-  is [K]-continuous. *)
+  is [K]-continuous. Contingent on [convex_set P] satisfying these two properties, 
+  and therfore assembling into a DCPOSL, it follows that the EM domain is in fact the
+  free K-DCPOSL for any [K] of size bigger than [P] *)
 
 Section EM_FREE.
   Context `{DCPO}.
