@@ -628,7 +628,6 @@ Section EGLI_MILNER_DOMAIN.
       + intros y _. apply div_set_bot.
   Qed.
 
-
   (* Unfortunately, whether this notion of powerdomain 
     is in fact a DCPOSL is quite subtle *)
   (* So instead, we show that under the condtion that the DCPO is finitary 
