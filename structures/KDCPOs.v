@@ -175,6 +175,19 @@ Proof.
   - intros I x Dx Kx y Hy. apply sc_lub. assumption.
 Qed.
 
+Lemma kc_bot_lb {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B}
+    (f : A -> B) `{!KContinuous K f} y :
+  lce (f bot) y.
+Proof.
+  apply (kc_lub (K := K) (Empty_set_rect _) (Kx := Empty_set_kdirected (inK := inK) _)).
+  intros [].
+Qed.
+
+Lemma kc_strict {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B}
+    (f : A -> B) `{!KContinuous K f} :
+  f bot = bot.
+Proof. apply (antisymmetry (R := lce)). apply (kc_bot_lb inK f). apply bot_lb. Qed.
+
 (** ** K-DCPOS *)
 
 (** It is easy to check that DCPOs and K-continuous functions assemble into a 

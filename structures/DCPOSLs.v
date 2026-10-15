@@ -51,10 +51,8 @@ Proof.
   intros Huv. apply (kc_lce (f := lsup (I := K))). exact Huv.
 Qed.
 
-(** Joins in a DCPOSL are convex with respect to [lce]: an element lying
-  [lce]-between [u] and [w] is [ref]-below any common upper bound of [u] and [w].
-  Indeed, by [lce]-monotonicity the join of the family [(u, v, w)] is
-  squeezed between the joins of [(u, u, w)] and [(u, w, w)], which coincide. *)
+(** Joins in a DCPOSL are convex with respect to [lce]. An element lying
+  [u] and [w], w.r.t. [lce], is below, w.r.t. [ref], any common upper bound of [u] and [w]. *)
 Lemma lsup_lce_between `{DCPOSL} (u v w y : L) :
   lce u v -> lce v w -> ref u y -> ref w y -> ref v y.
 Proof.
@@ -868,11 +866,11 @@ Class IsFDCPOSL (K : Type) (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} 
     emb_sc :: ScottContinuous true emb;
     ext {D} `{Ddcposl : DCPOSL D} : (P -> D) -> F -> D;
 
-    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} ::
+    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y} ::
       DCPOSLMorphism K (ext f);
-    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f} :
+    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y} :
       forall p, ext f (emb p) = f p;
-    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f}
+    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y}
       (g : F -> D) `{Hg : !DCPOSLMorphism K g} :
       (forall p, g (emb p) = f p) -> forall x, g x = ext f x;
   }.
@@ -1002,7 +1000,7 @@ Section EM_DOMAIN_FREE.
   Qed.
 
   Section EM_EXT_MOR.
-    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !ScottContinuous true f}.
+    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y}.
 
     Lemma em_ext_mon : Monotonic (em_ext f) (em_le ++> lce).
     Proof.
@@ -1032,12 +1030,12 @@ Section EM_DOMAIN_FREE.
         rewrite Hu, Hv.
         (* now both joins are over K, and K-continuity applies *)
         apply lsup_mon. intros [[a b] [xa [yb ab]]]. unfold u, v. cbn.
-        apply sc_lce. exact ab.
+        apply Hf. exact ab.
       - (* y is empty, so x is contained in {bot} *)
         transitivity (lsup (fun _ : {p : P | x p} => lsup (fun q : {q : P | y q} => f (`q)))).
         + apply lsup_mon. intros [a xa]. cbn.
           destruct (classic (a = bot)) as [-> | Ha].
-          * apply sc_bot_lb.
+          * apply Hf_strict.
           * destruct (fw a xa Ha) as [b [yb _]]. exfalso. apply Hyemp. exists b. exact yb.
         + (* a constant join equals the constant when the constant least *)
           replace (lsup (fun _ : {p : P | x p} => lsup (fun q : {q : P | y q} => f (`q))))
@@ -1055,8 +1053,8 @@ Section EM_DOMAIN_FREE.
       - (* the supremum is attained at some stage *)
         destruct (dsup_em_attained x (inhabited0 := Hinh)) as [u <-]. apply Hy.
       - (* empty family: the supremum is {bot}, and f is strict *)
-        rewrite (dsup_em_empty x Hemp), <- em_emb_bot, em_ext_ana. apply sc_bot_lb.
-    Qed.      
+        rewrite (dsup_em_empty x Hemp), <- em_emb_bot, em_ext_ana. apply Hf_strict.
+    Qed.
 
     (** The same for any arity [K] at least as large as [P]. *)
     Lemma em_ext_kcont_large {K} (r : K -> P) (Hsurj : forall p, exists c, r c = p)
@@ -1068,7 +1066,7 @@ Section EM_DOMAIN_FREE.
     Qed.
 
     Global Instance em_ext_sup_sc_cont : SupContinuous (em_ext f) :=
-      em_ext_sup_cont f (Hf := sc_lce).
+      em_ext_sup_cont f (Hf := Hf).
   End EM_EXT_MOR.
 End EM_DOMAIN_FREE.
 
@@ -1119,8 +1117,9 @@ Section EM_FREE.
   Next Obligation.
     split.
     - split.
-      + exact (em_ext_mon f).
-      + intros J x Dx Kx y Hy. apply (em_ext_kcont_large f r Hsurj); assumption.
+      + apply (em_ext_mon (Hf_strict := Hf_strict) f).
+      + intros J x Dx Kx y Hy. 
+        apply (em_ext_kcont_large (Hf_strict := Hf_strict) f r Hsurj); assumption.
     - exact (em_ext_sup_sc_cont f).
   Qed.
   Next Obligation.
@@ -1343,4 +1342,60 @@ Section EM_RELATIVE_MONAD.
     End CONVEX_MAP_KCONT_INSTANCE.
   End CONVEX_MAP_KCONT.
 
+  (** The unit and extension operators are both natural *)
+  Lemma em_emb_nat {X Y}   {lceX : relation X} {Xpo : PartialOrder lceX}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} (f : X -> convex_set Y) :
+    em_emb ;; convex_map f = f ;; em_emb.
+  Proof.
+    unfold convex_map. rewrite em_monad_runital. reflexivity.
+  Qed.
+
+  Lemma em_ext_nat_src {X Y Z} {lceX : relation X} {Xpo : PartialOrder lceX}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} {Zdcpo : DCPO Z}
+      (f : X -> convex_set Z) {Hf : Monotonic f (lceX ++> em_le)} (g : Y -> X) :
+    em_ext (g ;; f) = convex_map g ;; em_ext f.
+  Proof.
+    unfold convex_map.
+    rewrite <- (em_monad_assoc f (g ;; em_emb) (Hg := Hf)).
+    apply f_equal.
+    change (g ;; f = g ;; (em_emb ;; em_ext f)).
+    rewrite <- (em_monad_runital f). reflexivity.
+  Qed.
+
+  Lemma em_ext_nat_tgt {X Y Y'} {lceX : relation X} {Xpo : PartialOrder lceX}
+    {lceY : relation Y} {Ypo : PartialOrder lceY} {Y'dcpo : DCPO Y'}
+    (f : X -> convex_set Y) (h : Y -> Y') {Hh : Monotonic h (lceY ++> lce)} :
+    em_ext (f ;; convex_map h) = em_ext f ;; convex_map h.
+  Proof.
+    unfold convex_map.
+    exact (em_monad_assoc (h ;; em_emb) f (Hg := fun a b Hab => em_emb_mon _ _ (Hh _ _ Hab))).
+  Qed.
+
+  Section EM_KLEISLI.
+    Definition em_kl_compose {X Y Z} {lceY: relation Y} {Ypo : PartialOrder lceY}
+      {Zdcpo : DCPO Z}  (g : Y -> convex_set Z) (f : X -> convex_set Y) := 
+      f ;; em_ext g.
+    
+    Lemma kl_em_compose_id_left {X Y} {Ydcpo : DCPO Y} (f : X -> convex_set Y) :
+      em_kl_compose em_emb f = f.
+    Proof.
+      unfold em_kl_compose. rewrite em_monad_lunital. reflexivity.
+    Qed.
+
+    Lemma kl_em_compose_id_right {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
+      {Ydcpo : DCPO Y} (g : X -> convex_set Y) :
+      em_kl_compose g em_emb = g.
+    Proof.
+      unfold em_kl_compose. rewrite <- em_monad_runital. reflexivity.
+    Qed.
+
+    Lemma kl_em_compose_assoc {X Y Z W} {lceY : relation Y} {Ypo : PartialOrder lceY}
+        {Zdcpo : DCPO Z} {Wdcpo : DCPO W}
+        (h : Z -> convex_set W) (g : Y -> convex_set Z) (f : X -> convex_set Y)
+        {Hh : Monotonic h (lce ++> em_le)} :
+      em_kl_compose h (em_kl_compose g f) = em_kl_compose (em_kl_compose h g) f.
+    Proof.
+      unfold em_kl_compose. rewrite em_monad_assoc. reflexivity. assumption.
+    Qed.
+  End EM_KLEISLI.
 End EM_RELATIVE_MONAD.
