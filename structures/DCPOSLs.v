@@ -224,22 +224,25 @@ For an arbitrary [DCPO P] it is necessary to perform some kind of completion ove
 the structure defined below. Our hope is to work with simple enough DCPOs where
 the structure below will in fact not only be a DCPOSL but also a free DCPOSL. *)
 
-Section EGLI_MILNER_DOMAIN.
-  Context `{DCPO}.
+(** The EM order is not even a partial order for arbitrary subsets of P,
+  as it fails to satisfy antisymmetry *)
+(** It is easy to check that the class of subsets for which EM becomes
+  a partial order is exactly the convex sets. *)
 
-  (** The EM order is not even a partial order for arbitrary subsets of P, 
-    as it fails to satisfy antisymmetry *)
-  (** It is easy to check that the class of subsets for which EM becomes 
-    a partial order is exactly the convex sets. *)
+Record convex_set (P : Type) {R : relation P} `{!PartialOrder R} :=
+  {
+    mem :> P -> Prop;
+    convexity : forall a b c, mem a -> mem c -> R a b -> R b c -> mem b;
+  }.
 
-  Record convex_set :=
-    {
-      mem :> P -> Prop;
-      convexity : forall a b c, mem a -> mem c -> lce a b -> lce b c -> mem b;
-    }.
+Arguments mem {_ _ _} _ _.
+Arguments convexity {_ _ _} _ _ _ _.
+
+Section CONVEX_SETS.
+  Context `{PartialOrder}.
 
   (** Extensional equality for convex sets *)
-  Lemma convex_set_ext (x y : convex_set) :
+  Lemma convex_set_ext (x y : convex_set P) :
     (forall a, x a <-> y a) -> x = y.
   Proof.
     intros Hxy. destruct x as [x Hx], y as [y Hy]. cbn in *.
@@ -251,7 +254,7 @@ Section EGLI_MILNER_DOMAIN.
   (** *** Semilattice Structure *)
 
   (** The order is just set inclusion *)
-  Definition incl (x y : convex_set) := forall a, x a -> y a. 
+  Definition incl (x y : convex_set P) := forall a, x a -> y a. 
 
   Global Instance incl_po : PartialOrder incl.
   Proof.
@@ -260,7 +263,7 @@ Section EGLI_MILNER_DOMAIN.
     firstorder.
   Qed.
 
-  Global Instance convex_poset : Poset convex_set :=
+  Global Instance convex_poset : Poset (convex_set P) :=
   {
     ref := incl;
   }.
@@ -273,11 +276,11 @@ Section EGLI_MILNER_DOMAIN.
   (** A key operation for the EM powerdomain is the convex hull operation. *)
   (** The convex hull operator is the smallest convex set including the original set *)
 
-  Definition chull_mem (x : P -> Prop) (b : P) := 
-    exists a c , x a /\ x c /\ lce a b /\ lce b c.
+  Definition chull_mem (x : P -> Prop) (b : P) :=
+    exists a c , x a /\ x c /\ R a b /\ R b c.
 
-  Lemma chull_convexity (x : P -> Prop) : 
-    forall a b c, chull_mem x a -> chull_mem x c -> lce a b -> lce b c -> chull_mem x b.
+  Lemma chull_convexity (x : P -> Prop) :
+    forall a b c, chull_mem x a -> chull_mem x c -> R a b -> R b c -> chull_mem x b.
   Proof.
     intros a b c mem_a mem_c lce_a_b lce_b_c.
     destruct mem_a as [a' [a'' [in_x_a' [in_x_a'' [lce_a'_a lce_a_a'']]]]].
@@ -286,7 +289,7 @@ Section EGLI_MILNER_DOMAIN.
     transitivity a; assumption. transitivity c; assumption.
   Qed.
 
-  Definition chull (x : P -> Prop) : convex_set := 
+  Definition chull (x : P -> Prop) : convex_set P := 
   {|
     mem := chull_mem x;
     convexity := chull_convexity x;
@@ -300,7 +303,7 @@ Section EGLI_MILNER_DOMAIN.
     exists a. exists a. repeat (try split); try assumption; try reflexivity.
   Qed.
 
-  Lemma chull_convex_id (x : convex_set) : chull x = x.
+  Lemma chull_convex_id (x : convex_set P) : chull x = x.
   Proof.
     apply convex_set_ext. intros b. split.
     - intros [a [c [ax [cx [ab bc]]]]]. apply (convexity x a b c); assumption.
@@ -334,11 +337,11 @@ Section EGLI_MILNER_DOMAIN.
 
   (** Joins are given by the convex union *)
   
-  Definition convex_sup {I} (x : I -> convex_set) : convex_set := chull (union x).
+  Definition convex_sup {I} (x : I -> convex_set P) : convex_set P := chull (union x).
 
   (** Note that no assumption on the DCPO is required for the semilattice structure *)
 
-  Global Program Instance convex_sl : SemiLattice convex_set :=
+  Global Program Instance convex_sl : SemiLattice (convex_set P) :=
     {
       lsup I x := convex_sup x;
     }.
@@ -349,12 +352,18 @@ Section EGLI_MILNER_DOMAIN.
       destruct in_csup as [a [c [in_union_a [in_union_c [lce_a_b lce_b_c]]]]].
       apply (convexity y a b c); auto.
       destruct in_union_a as [i in_u]. apply (incl_u_y i). assumption.
-      destruct in_union_c as [i in_u]. apply (incl_u_y i). assumption. 
+      destruct in_union_c as [i in_u]. apply (incl_u_y i). assumption.
   Qed.
+
+End CONVEX_SETS.
+
+
+Section EGLI_MILNER_DOMAIN.
+  Context `{DCPO}.
 
   (** *** Candidate DCPO Structure *)
 
-  Record em_le (x y : convex_set) :=
+  Record em_le (x y : convex_set P) :=
     {
       (** fw: no information is dropped, if a in x then it evolves to some b in y *)
       (** different from standard EM, we consider bot and do not enforce fw for it *)
@@ -364,7 +373,7 @@ Section EGLI_MILNER_DOMAIN.
     }.
 
   (** bot can only be removed forwardly *)
-  Lemma le_div (x y : convex_set) :
+  Lemma le_div (x y : convex_set P) :
     em_le x y -> y bot -> x bot.
   Proof.
     intros Hle Hybot. destruct Hle as [Hfw Hbw].
@@ -373,7 +382,7 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 
   (** the bottom element for em_le is {div} *)
-  Program Definition div_set := 
+  Program Definition div_set : convex_set P :=
   {|
     mem x := x = bot;
   |}.
@@ -381,7 +390,7 @@ Section EGLI_MILNER_DOMAIN.
     apply lce_bot_eq; assumption.
   Defined.
 
-  Lemma div_set_bot (x : convex_set) : em_le div_set x.
+  Lemma div_set_bot (x : convex_set P) : em_le div_set x.
   Proof.
     split.
     - intros a in_div_set neq_bot. 
@@ -409,7 +418,7 @@ Section EGLI_MILNER_DOMAIN.
       exists a. split. assumption. transitivity b; assumption.
   Qed.
 
-  Lemma em_le_incl (x y : convex_set) :
+  Lemma em_le_incl (x y : convex_set P) :
     em_le x y -> em_le y x -> incl x y.
   Proof.
     intros Hxy Hyx a Hxa.
@@ -437,13 +446,13 @@ Section EGLI_MILNER_DOMAIN.
 
   (** the supremum is the set of all elements that are eventually always present *)
   (** bot is only present if it never gets removed *)
-  Definition dsup_em_mem {I} (x : I -> convex_set) `{Hx: !Directed x} : P -> Prop :=
+  Definition dsup_em_mem {I} (x : I -> convex_set P) `{Hx: !Directed x} : P -> Prop :=
     fun a => (a = bot -> forall i, x i bot) /\
              (a <> bot -> exists i, forall j, em_le (x i) (x j) -> x j a).
 
   (** A technicality is that the bot case follows from the non-bot condition 
     as long as [I] is non-empty. *)
-  Lemma dsup_em_mem_inhabited {I} (x : I -> convex_set) `{Hx: !Directed x} `{inhabited I} : 
+  Lemma dsup_em_mem_inhabited {I} (x : I -> convex_set P) `{Hx: !Directed x} `{inhabited I} : 
     forall a, dsup_em_mem x a <-> exists i, forall j, em_le (x i) (x j) -> x j a.
   Proof.
     intros a. split. 
@@ -454,7 +463,7 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 
   (** Convexity follows straight-forwardly *)
-  Lemma dsup_em_convexity {I} (x : I -> convex_set) `{Hx: !Directed x} : 
+  Lemma dsup_em_convexity {I} (x : I -> convex_set P) `{Hx: !Directed x} : 
     forall a b c, dsup_em_mem x a -> dsup_em_mem x c -> lce a b -> lce b c -> dsup_em_mem x b.
   Proof.
     intros a b c [Ha_bot Ha] [Hc_bot Hc] lce_a_b lce_b_c.
@@ -475,7 +484,7 @@ Section EGLI_MILNER_DOMAIN.
         apply Hj. transitivity (x k); assumption.
   Qed.
 
-  Definition dsup_em {I} (x : I -> convex_set) `{Hx: !Directed x} : convex_set := 
+  Definition dsup_em {I} (x : I -> convex_set P) `{Hx: !Directed x} : convex_set P := 
   {|
     mem := dsup_em_mem x;
     convexity := dsup_em_convexity x;
@@ -485,7 +494,7 @@ Section EGLI_MILNER_DOMAIN.
 
   (** If a finite set of elements are all eventually always absent, then there is 
   a stage when they are all simultaneously absent. *)
-  Lemma eventually_absent_all {I} (x : I -> convex_set) `{Hx : !Directed x} `{inhabited I} (b : P) (l : list P) :
+  Lemma eventually_absent_all {I} (x : I -> convex_set P) `{Hx : !Directed x} `{inhabited I} (b : P) (l : list P) :
     (forall a, In a l -> lce a b -> exists i, forall j, em_le (x i) (x j) -> ~ x j a) ->
     exists i, forall j, em_le (x i) (x j) -> forall a, In a l -> lce a b -> ~ x j a.
   Proof.
@@ -504,7 +513,7 @@ Section EGLI_MILNER_DOMAIN.
         * exact (Hi1 j Hj a' Hin Ha'b).
   Qed.
 
-  Lemma cofinal_always_eventually_present {I} (x : I -> convex_set) 
+  Lemma cofinal_always_eventually_present {I} (x : I -> convex_set P) 
    `{!Directed x} `{inhabited I} (a : P) :
     (forall i, exists j, em_le (x i) (x j) /\ x j a) ->
     exists i, forall j, em_le (x i) (x j) -> x j a.
@@ -525,7 +534,7 @@ Section EGLI_MILNER_DOMAIN.
 
   (** Once an element has appeared in a directed family and then disappeared,
     it never comes back *)
-  Lemma em_absent_forever {J} (x : J -> convex_set) (p : P) j0 j1 :
+  Lemma em_absent_forever {J} (x : J -> convex_set P) (p : P) j0 j1 :
     em_le (x j0) (x j1) -> x j0 p -> ~ x j1 p ->
     forall j, em_le (x j1) (x j) -> ~ x j p.
   Proof.
@@ -538,7 +547,7 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 
   (** Membership of every element eventually settles, to its value in [dsup_em]. *)
-  Lemma em_settles {J} (x : J -> convex_set) `{Hx : !Directed x} `{inhabited J} (p : P) :
+  Lemma em_settles {J} (x : J -> convex_set P) `{Hx : !Directed x} `{inhabited J} (p : P) :
     exists i, forall j, em_le (x i) (x j) -> (x j p <-> dsup_em_mem x p).
   Proof.
     destruct inhabited0 as [j0].
@@ -572,7 +581,7 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 
   (** A [P]-directed family in the EM domain attains its supremum. *)
-  Lemma dsup_em_attained {J} (x : J -> convex_set) `{Hx : !Directed x} `{inhabited J}
+  Lemma dsup_em_attained {J} (x : J -> convex_set P) `{Hx : !Directed x} `{inhabited J}
       `{Kx : !KDirected (R := em_le) P x} :
     exists u, x u = dsup_em x.
   Proof.
@@ -583,7 +592,7 @@ Section EGLI_MILNER_DOMAIN.
     exact (Hk p u (Hu p)).
   Qed.
 
-  Lemma dsup_em_empty {J} (x : J -> convex_set) `{Hx : !Directed x} :
+  Lemma dsup_em_empty {J} (x : J -> convex_set P) `{Hx : !Directed x} :
     ~ inhabited J -> dsup_em x = div_set.
   Proof.
     intros Hemp. apply convex_set_ext. intros a. cbn. split.
@@ -594,12 +603,38 @@ Section EGLI_MILNER_DOMAIN.
       + intros Hc. contradiction Hc. reflexivity.
   Qed.
 
+  Lemma dsup_em_kdirected_issup {J} (x : J -> convex_set P) `{Hx : !Directed x}
+      `{Kx : !KDirected (R := em_le) P x} :
+    IsSup (R := em_le) x (dsup_em x).
+  Proof.
+    destruct (classic (inhabited J)) as [Hinh | Hemp].
+    - destruct (choice (fun p i => forall j, em_le (x i) (x j) -> (x j p <-> dsup_em_mem x p))
+                       (em_settles x (inhabited0 := Hinh))) as [k Hk].
+      destruct (Kx k) as [u Hu].
+      assert (Hstable : forall v, em_le (x u) (x v) -> x v = x u).
+      { intros v Huv. apply convex_set_ext. intros p.
+        assert (Hv : em_le (x (k p)) (x v)) by (transitivity (x u); [apply Hu | exact Huv]).
+        split; intros Hp.
+        - apply (Hk p u (Hu p)), (Hk p v Hv), Hp.
+        - apply (Hk p v Hv), (Hk p u (Hu p)), Hp. }
+      assert (Hdsup : dsup_em x = x u).
+      { apply convex_set_ext. intros p. cbn. symmetry. exact (Hk p u (Hu p)). }
+      rewrite Hdsup. split.
+      + intros i. destruct (directed i u) as [v [Hiv Huv]].
+        rewrite <- (Hstable v Huv). exact Hiv.
+      + intros y Hy. apply Hy.
+    - rewrite (dsup_em_empty x Hemp). split.
+      + intros i. exfalso. apply Hemp. exact (inhabits i).
+      + intros y _. apply div_set_bot.
+  Qed.
+
+
   (* Unfortunately, whether this notion of powerdomain 
     is in fact a DCPOSL is quite subtle *)
   (* So instead, we show that under the condtion that the DCPO is finitary 
     it is so. *)
   
-  Global Program Instance em_dcpo `{!Finitary (R := lce)} : DCPO convex_set := 
+  Global Program Instance em_dcpo `{!Finitary (R := lce)} : DCPO (convex_set P) := 
   {|
     lce := em_le;
     dsup := @dsup_em;
@@ -686,7 +721,7 @@ Section EGLI_MILNER_DOMAIN.
         contradiction.
   Qed.
 
-  Global Program Instance em_dcposl `{!Finitary (R := lce)} : DCPOSL convex_set :=
+  Global Program Instance em_dcposl `{!Finitary (R := lce)} : DCPOSL (convex_set P) :=
   {|
     dcposl_dcpo := em_dcpo;
     dcposl_sl := convex_sl;
@@ -843,17 +878,89 @@ Class IsFDCPOSL (K : Type) (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} 
       (forall p, g (emb p) = f p) -> forall x, g x = ext f x;
   }.
 
-Section EM_DOMAIN_FREE.
-  Context `{DCPO}.
+(** The embedding and the extension operator, together with the universal
+  property of the extension with respect to sup-continuous maps, only use the
+  partial order on [P]. The DCPO structure is needed later to show that they
+  are Scott-continuous. *)
+
+Section EM_EMB_EXT.
+  Context `{PartialOrder}.
 
   (** We define the embedding map into the EM domain, which is just the singleton map *)
-  Program Definition em_emb a : convex_set := 
+  Program Definition em_emb a : convex_set P :=
   {|
     mem := (fun b => b = a)
   |}.
   Next Obligation.
     apply antisymmetry; assumption.
   Qed.
+
+  (** The universal extension is just the join of the image of the convex set *)
+  Definition em_ext {D} `{SemiLattice D} (f : P -> D) (x : convex_set P) : D :=
+    lsup (fun (p : {p : P | x p}) => f (`p)).
+
+  Lemma em_ext_ana {D} `{Ddcposl : SemiLattice D} (f : P -> D) :
+    forall p, em_ext f (em_emb p) = f p.
+  Proof.
+    intros p. unfold em_emb, em_ext. simpl.
+    apply antisymmetry.
+    - apply sup_lub. intros i. destruct i. subst. reflexivity.
+    - exact (sup_ub (exist (fun q => q = p) p eq_refl)).
+  Qed.
+
+  Lemma emb_join_eq (x : convex_set P) :
+    lsup (fun (p : {p : P | x p}) => em_emb (`p)) = x.
+  Proof.
+    apply (antisymmetry (R := incl)).
+    - intros p Hsup. destruct Hsup as [a [c [ua [uc [ap pc]]]]].
+      destruct ua as [[a' xa'] emba']. destruct uc as [[c' xc'] embc'].
+      simpl in emba', embc'; subst. apply (convexity x a' p c'); assumption.
+    - intros p xp. apply chull_extensive.
+      exists (exist _ p xp). reflexivity.
+  Qed.
+
+  Lemma em_ext_unique {D} `{Ddcposl : SemiLattice D} (f : P -> D)
+      (g : convex_set P -> D) `{!SupContinuous g}  :
+      (forall p, g (em_emb p) = f p) -> forall x, g x = em_ext f x.
+  Proof.
+    intros Hemb x.
+    transitivity (g (lsup (fun p : {p : P | x p} => em_emb (`p)))).
+    - f_equal. symmetry. apply emb_join_eq.
+    - rewrite sup_cont. unfold em_ext. f_equal.
+      apply functional_extensionality.
+      intros [p Hp]. apply Hemb.
+  Qed.
+
+  (** Sup-continuity of the extension only requires [f] to be monotonic
+    from the order on [P] to the [lce] order of a DCPOSL. *)
+  Global Instance em_ext_sup_cont {D} `{Ddcposl : DCPOSL D} (f : P -> D)
+      `{Hf : !Monotonic f (R ++> lce)} :
+    SupContinuous (em_ext f).
+  Proof.
+    split. intros I x. unfold em_ext. cbn.
+    apply (antisymmetry (R := ref)).
+    - (* an element of the convex union lies between two elements [a] and [c]
+         of the union, so by [lce]-convexity of joins its image is bounded by
+         the join of [f a] and [f c], both of which are below the right-hand side *)
+      apply sup_lub. intros [p Hp]. cbn.
+      destruct Hp as [a [c [[i xa] [[j xc] [ap pc]]]]].
+      apply (lsup_lce_between (f a) (f p) (f c)).
+      + apply Hf. exact ap.
+      + apply Hf. exact pc.
+      + apply (sup_at i). apply (sup_at (exist (fun q => x i q) a xa)). reflexivity.
+      + apply (sup_at j). apply (sup_at (exist (fun q => x j q) c xc)). reflexivity.
+    - (* conversely every element of some [x i] is in the convex union *)
+      apply sup_lub. intros i. apply sup_lub. intros [p xp]. cbn.
+      apply (sup_at (exist (fun q => convex_sup x q) p
+                       (chull_extensive _ _ (ex_intro _ i xp)))).
+      reflexivity.
+  Qed.
+End EM_EMB_EXT.
+
+(** On a DCPO, the embedding and the extension are moreover Scott-continuous. *)
+
+Section EM_DOMAIN_FREE.
+  Context `{DCPO}.
 
   Lemma em_emb_bot : em_emb bot = div_set.
   Proof.
@@ -893,42 +1000,6 @@ Section EM_DOMAIN_FREE.
       exists b. split; [assumption|]. apply Hub; assumption.
     - intros b in_y. exists (dsup x). split; [reflexivity|].
       apply Hub. assumption.
-  Qed.
-
-  (** The universal extension is just the join of the image of the convex set *)
-  Definition em_ext {D} `{SemiLattice D} (f : P -> D) (x : convex_set) : D := 
-    lsup (fun (p : {p : P | x p}) => f (`p)).
-
-  Lemma em_ext_ana {D} `{Ddcposl : SemiLattice D} (f : P -> D) :
-    forall p, em_ext f (em_emb p) = f p.
-  Proof.
-    intros p. unfold em_emb, em_ext. simpl.
-    apply antisymmetry.
-    - apply sup_lub. intros i. destruct i. subst. reflexivity.
-    - exact (sup_ub (exist (fun q => q = p) p eq_refl)).
-  Qed.
-
-  Lemma emb_join_eq (x : convex_set) : 
-    lsup (fun (p : {p : P | x p}) => em_emb (`p)) = x.
-  Proof.
-    apply (antisymmetry (R := incl)).
-    - intros p Hsup. destruct Hsup as [a [c [ua [uc [ap pc]]]]].
-      destruct ua as [[a' xa'] emba']. destruct uc as [[c' xc'] embc'].
-      simpl in emba', embc'; subst. apply (convexity x a' p c'); assumption.
-    - intros p xp. apply chull_extensive.
-      exists (exist _ p xp). reflexivity.
-  Qed.
-
-  Lemma em_ext_unique {D} `{Ddcposl : SemiLattice D} (f : P -> D)
-      (g : convex_set -> D) `{!SupContinuous g}  :
-      (forall p, g (em_emb p) = f p) -> forall x, g x = em_ext f x.
-  Proof.
-    intros Hemb x.
-    transitivity (g (lsup (fun p : {p : P | x p} => em_emb (`p)))).
-    - f_equal. symmetry. apply emb_join_eq.
-    - rewrite sup_cont. unfold em_ext. f_equal.
-      apply functional_extensionality. 
-      intros [p Hp]. apply Hemb.
   Qed.
 
   Section EM_EXT_MOR.
@@ -977,7 +1048,7 @@ Section EM_DOMAIN_FREE.
           * intros k. reflexivity.
     Qed.
 
-    Lemma em_ext_kcont {J} (x : J -> convex_set) `{Dx : !Directed (R := em_le) x}
+    Lemma em_ext_kcont {J} (x : J -> convex_set P) `{Dx : !Directed (R := em_le) x}
         `{Kx : !KDirected (R := em_le) P x} y :
       (forall j, lce (em_ext f (x j)) y) -> lce (em_ext f (dsup_em x)) y.
     Proof.
@@ -990,33 +1061,15 @@ Section EM_DOMAIN_FREE.
 
     (** The same for any arity [K] at least as large as [P]. *)
     Lemma em_ext_kcont_large {K} (r : K -> P) (Hsurj : forall p, exists c, r c = p)
-        {J} (x : J -> convex_set) `{Dx : !Directed (R := em_le) x}
+        {J} (x : J -> convex_set P) `{Dx : !Directed (R := em_le) x}
         `{Kx : !KDirected (R := em_le) K x} y :
       (forall j, lce (em_ext f (x j)) y) -> lce (em_ext f (dsup_em x)) y.
     Proof.
       apply em_ext_kcont. exact (kdirected_surj r Hsurj x Kx).
     Qed.
 
-    Global Instance em_ext_sup_cont : SupContinuous (em_ext f).
-    Proof.
-      split. intros I x. unfold em_ext. cbn.
-      apply (antisymmetry (R := ref)).
-      - (* an element of the convex union lies between two elements [a] and [c]
-           of the union, so by [lce]-convexity of joins its image is bounded by
-           the join of [f a] and [f c], both of which are below the right-hand side *)
-        apply sup_lub. intros [p Hp]. cbn.
-        destruct Hp as [a [c [[i xa] [[j xc] [ap pc]]]]].
-        apply (lsup_lce_between (f a) (f p) (f c)).
-        + apply sc_lce. exact ap.
-        + apply sc_lce. exact pc.
-        + apply (sup_at i). apply (sup_at (exist (fun q => x i q) a xa)). reflexivity.
-        + apply (sup_at j). apply (sup_at (exist (fun q => x j q) c xc)). reflexivity.
-      - (* conversely every element of some [x i] is in the convex union *)
-        apply sup_lub. intros i. apply sup_lub. intros [p xp]. cbn.
-        apply (sup_at (exist (fun q => convex_sup x q) p
-                         (chull_extensive _ _ (ex_intro _ i xp)))).
-        reflexivity.
-    Qed.
+    Global Instance em_ext_sup_sc_cont : SupContinuous (em_ext f) :=
+      em_ext_sup_cont f (Hf := sc_lce).
   End EM_EXT_MOR.
 End EM_DOMAIN_FREE.
 
@@ -1024,17 +1077,17 @@ End EM_DOMAIN_FREE.
 
 (** We parametrize by the two facts that are are required to make the EM domain a 
   DCPOSL: [dsup_em] is the supremum for [em_le], and the join
-  is [K]-continuous. Contingent on [convex_set P] satisfying these two properties, 
+  is [K]-continuous. Contingent on [convex_set P] satisfying these two properties,
   and therfore assembling into a DCPOSL, it follows that the EM domain is in fact the
   free K-DCPOSL for any [K] of size bigger than [P] *)
 
 Section EM_FREE.
   Context `{DCPO}.
 
-  Context (em_issup : forall {I} (x : I -> convex_set) `{!Directed (R := em_le) x},
+  Context (em_issup : forall {I} (x : I -> convex_set P) `{!Directed (R := em_le) x},
               IsSup (R := em_le) x (dsup_em x)).
 
-  Local Instance em_dcpo_gen : DCPO convex_set :=
+  Local Instance em_dcpo_gen : DCPO (convex_set P) :=
     {|
       lce := em_le;
       lce_po := em_le_po;
@@ -1042,9 +1095,9 @@ Section EM_FREE.
       dsup_is_sup := em_issup;
     |}.
 
-  Context (em_kcont : forall K, KContinuous K (lsup (L := @convex_set P H) (I := K))).
+  Context (em_kcont : forall K, KContinuous K (lsup (L := convex_set P) (I := K))).
 
-  Local Instance em_dcposl_gen : DCPOSL (@convex_set P H) :=
+  Local Instance em_dcposl_gen : DCPOSL (convex_set P) :=
     {|
       dcposl_dcpo := em_dcpo_gen;
       dcposl_sl := convex_sl;
@@ -1054,7 +1107,7 @@ Section EM_FREE.
   (** The arity [K] of the morphisms must be at least as large as [P]. *)
   Context {K} (r : K -> P) (Hsurj : forall p, exists c, r c = p).
 
-  Global Program Instance em_fdcposl : IsFDCPOSL K P (@convex_set P H) :=
+  Global Program Instance em_fdcposl : IsFDCPOSL K P (convex_set P) :=
     {|
       emb := em_emb;
       ext D _ f := em_ext f;
@@ -1069,7 +1122,7 @@ Section EM_FREE.
     - split.
       + exact (em_ext_mon f).
       + intros J x Dx Kx y Hy. apply (em_ext_kcont_large f r Hsurj); assumption.
-    - exact (em_ext_sup_cont f).
+    - exact (em_ext_sup_sc_cont f).
   Qed.
   Next Obligation.
     apply em_ext_ana.
@@ -1084,12 +1137,211 @@ Section EM_FREE_FINITARY.
   Context `{DCPO} `{!Finitary (R := lce)}.
 
   Definition em_fdcposl_finitary {K} (r : K -> P) (Hsurj : forall p, exists c, r c = p) :
-    IsFDCPOSL K P (@convex_set P H) :=
+    IsFDCPOSL K P (convex_set P) :=
     em_fdcposl (@dsup_is_sup _ em_dcpo) (@sup_kcont _ em_dcposl) r Hsurj.
 End EM_FREE_FINITARY.
 
-(** ** The EM Powerdomain Monad *)
+(** ** The EM Powerdomain Relative Monad *)
 
 Section EM_RELATIVE_MONAD.
-  Check convex_set.
+  Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
+  Local Abbreviation id := (fun x => x).
+
+  (** The Free(ish) structure defined above defines a monad relative to 
+    the inclusion functor [J K : WSDCPO -> KDCPO] defined in KDCPO.v.
+    The mapping on objects takes [X] to [convex_set X]. *)
+  (** It satisfies the three relative monad laws. *)
+
+  Lemma em_monad_runital {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} (f : X -> convex_set Y) :
+    f = em_emb ;; em_ext f.
+  Proof.
+    apply functional_extensionality. intros x. apply convex_set_ext.
+    intros y. split.
+    - intros Hfxy. apply chull_extensive.
+      exists (exist (fun p => p = x) x eq_refl). assumption.
+    - intros [a [c [a_in [c_in [lce_a_y lce_y_c]]]]].
+      destruct a_in as [[x' Heqx'] fa]. destruct c_in as [[x'' Heqx''] fc].
+      simpl in Heqx', Heqx''. subst. apply (convexity (f x) a y c); assumption.
+  Qed.
+
+  Lemma em_monad_lunital {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
+    em_ext (em_emb (P := X)) = id.
+  Proof.
+    apply functional_extensionality. intros x.
+    apply convex_set_ext. intros b. split.
+    - intros [a [c [a_in [c_in [lce_a_y lce_y_c]]]]].
+      destruct a_in as [[a' Ha'] Heqa']. destruct c_in as [[c' Hc'] Heqc'].
+      simpl in Heqa', Heqc'. subst. apply (convexity x a' b c'); assumption.
+    - intros in_x. apply chull_extensive.
+      exists (exist _ b in_x). reflexivity.
+  Qed.
+
+  Lemma em_monad_assoc {X Y Z} {lceX : relation X} {Xpo : PartialOrder lceX}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} {Zdcpo : DCPO Z}
+      (g : Y -> convex_set Z) (f :  X -> convex_set Y)
+      {Hg : Monotonic g (lceY ++> em_le)} :
+      em_ext (f ;; em_ext g) = em_ext f ;; em_ext g.
+  Proof.
+    apply functional_extensionality. intros x.
+    apply convex_set_ext. intros zb. split.
+    - intros [a [c [a_in [c_in [lce_a_y lce_y_c]]]]].
+      destruct a_in as [[a' Ha'] Hexta']. destruct c_in as [[c' Hc'] Hextc'].
+      destruct Hexta' as [alo' [ahi' [in_alo' [in_ahi' [lcealo' lceahi']]]]].
+      destruct Hextc' as [clo' [chi' [in_clo' [in_chi' [lceclo' lcechi']]]]].
+      exists alo'. exists chi'. split; [|split;[|split]].
+      + destruct in_alo' as [[p Hp] Hfp].
+        assert (H: em_ext f x p).
+        {
+          apply chull_extensive. exists (exist _ a' Ha'). assumption.
+        }
+        exists (exist _ p H). assumption.
+      + destruct in_chi' as [[p Hp] Hfp]. 
+        assert (H: em_ext f x p).
+        {
+          apply chull_extensive. exists (exist _ c' Hc'). assumption.
+        }
+        exists (exist _ p H). assumption.
+      + transitivity a; assumption.
+      + transitivity c; assumption.
+    - intros [za [zc [za_in [zc_in [lce_za_zb lce_zb_zc]]]]].
+      assert (Hbr : forall p, em_ext f x p -> forall z, g p z ->
+        (exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lce a z) /\
+        (exists c, union (fun q : {q : X | x q} => em_ext g (f (`q))) c /\ lce z c)).
+      {
+        intros p [ay [cy [[qa Hay] [[qc Hcy] [lce_ay_p lce_p_cy]]]]] z Hz.
+        assert (Hlo : exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lce a z).
+        {
+          destruct (Hg ay p lce_ay_p) as [_ bw].
+          destruct (bw z Hz) as [a [Ha lce_a_z]].
+          exists a. split; [| exact lce_a_z].
+          exists qa. apply chull_extensive. exists (exist _ ay Hay). exact Ha.
+        }
+        split; [exact Hlo |].
+        destruct (classic (z = bot)) as [-> | Hz_bot].
+        - destruct Hlo as [a [Ha _]]. exists a. split; [exact Ha | apply bot_lb].
+        - destruct (Hg p cy lce_p_cy) as [fw _].
+          destruct (fw z Hz Hz_bot) as [c [Hc lce_z_c]].
+          exists c. split; [| exact lce_z_c].
+          exists qc. apply chull_extensive. exists (exist _ cy Hcy). exact Hc.
+      }
+      destruct za_in as [[pa Hpa] Hza]. destruct zc_in as [[pc Hpc] Hzc].
+      destruct (Hbr pa Hpa za Hza) as [[a [Ha lce_a_za]] _].
+      destruct (Hbr pc Hpc zc Hzc) as [_ [c [Hc lce_zc_c]]].
+      exists a, c. split; [exact Ha | split; [exact Hc | split]].
+      + transitivity za; assumption.
+      + transitivity zc; assumption.
+  Qed.
+
+  (** The laws are enough to define a functor mapping monotonic functions 
+    [f : X -> Y] to functions [convex_map f : convex_set X -> convex_set Y] *)
+  Definition convex_map {X Y} {lceX : relation X} {Xpo : PartialOrder lceX} 
+    {lceY : relation Y} {Ypo : PartialOrder lceY} 
+    (f : X -> Y) := em_ext (f ;; em_emb).
+
+  Lemma convex_map_id {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
+    convex_map id = id.
+  Proof.
+    unfold convex_map. rewrite em_monad_lunital. reflexivity.
+  Qed.
+
+  Lemma convex_map_compose {X Y Z}  {lceX : relation X} {Xpo : PartialOrder lceX}
+    {lceY : relation Y} {Ypo : PartialOrder lceY}  {Zdcpo : DCPO Z}
+    (g : Y -> Z) (f : X -> Y) {Hg : Monotonic g (lceY ++> lce)} :
+    convex_map (f ;; g) = convex_map f ;; convex_map g.
+  Proof.
+    unfold convex_map.
+    rewrite <- (em_monad_assoc (g ;; em_emb) (f ;; em_emb)
+                  (Hg := fun a b Hab => em_emb_mon _ _ (Hg _ _ Hab))).
+    apply f_equal. 
+    change (f ;; (g ;; em_emb) = f ;; (em_emb ;; em_ext (g ;; em_emb))).
+    rewrite <- (em_monad_runital (g ;; em_emb)). reflexivity.
+  Qed.
+
+  (** *** Continuity of [convex_map] *)
+
+  (** When [f] is strict Scott-continuous and [X] is well-sized with respect
+    to [K], [convex_map f] is monotonic for the EM order and preserves the
+    [dsup_em] of K-directed families: such a family is X-directed and hence
+    attains its supremum, while the empty family is handled by strictness of
+    [f]. *)
+
+  Section CONVEX_MAP_KCONT.
+    Context {K X Y} `{Xws : WSDCPO K X} `{Ydcpo : DCPO Y}.
+    Context (f : X -> Y) `{Hf : !ScottContinuous true f}.
+
+    Lemma convex_map_mon : Monotonic (convex_map f) (em_le ++> em_le).
+    Proof.
+      unfold convex_map. intros x x' [fw bw]. split.
+      - (* fw: [a] lies between [f p] and [f q] with [p, q] in [x]; since [a]
+           is not [bot], neither is [q], so it evolves to some [q'] in [x'] *)
+        intros a Ha Ha_nbot.
+        destruct Ha as [lo [hi [[[p Hp] Hlo] [[[q Hq] Hhi] [lce_lo_a lce_a_hi]]]]].
+        cbn in Hlo, Hhi. subst lo hi.
+        assert (Hq_nbot : q <> bot).
+        { intros ->. apply Ha_nbot, lce_bot_eq.
+          transitivity (f bot); [exact lce_a_hi | apply sc_bot_lb]. }
+        destruct (fw q Hq Hq_nbot) as [q' [Hq' lce_q_q']].
+        exists (f q'). split.
+        + apply chull_extensive. exists (exist _ q' Hq'). reflexivity.
+        + transitivity (f q); [exact lce_a_hi | apply sc_lce; exact lce_q_q'].
+      - (* bw: [b] is above some [f p'] with [p'] in [x'], justified by [p] in [x] *)
+        intros b Hb.
+        destruct Hb as [lo [hi [[[p' Hp'] Hlo] [_ [lce_lo_b _]]]]].
+        cbn in Hlo. subst lo.
+        destruct (bw p' Hp') as [p [Hp lce_p_p']].
+        exists (f p). split.
+        + apply chull_extensive. exists (exist _ p Hp). reflexivity.
+        + transitivity (f p'); [apply sc_lce; exact lce_p_p' | exact lce_lo_b].
+    Qed.
+
+    Lemma convex_map_dsup_em {I} (x : I -> convex_set X) `{Dx : !Directed (R := em_le) x}
+        `{Kx : !KDirected (R := em_le) K x} y :
+      (forall i, em_le (convex_map f (x i)) y) -> em_le (convex_map f (dsup_em x)) y.
+    Proof.
+      intros Hy. destruct (classic (inhabited I)) as [Hinh | Hemp].
+      - (* the supremum is attained at some stage *)
+        destruct (dsup_em_attained x (inhabited0 := Hinh)
+                    (Kx := kdirected_surj wsdcpo_emb wsdcpo_surj x Kx)) as [u <-].
+        apply Hy.
+      - (* empty family: the supremum is {bot}, and f is strict *)
+        rewrite (dsup_em_empty x Hemp), <- em_emb_bot.
+        unfold convex_map. rewrite em_ext_ana. cbn.
+        rewrite sc_bot, em_emb_bot. apply div_set_bot.
+    Qed.
+
+    (** To state this as K-continuity, the EM domains must be DCPOs, which
+      as in [EM_FREE] we assume through [dsup_em] being a supremum. *)
+
+    Section CONVEX_MAP_KCONT_INSTANCE.
+      Context (em_issup_X : forall {I} (x : I -> convex_set X) `{!Directed (R := em_le) x},
+                  IsSup (R := em_le) x (dsup_em x)).
+      Context (em_issup_Y : forall {I} (y : I -> convex_set Y) `{!Directed (R := em_le) y},
+                  IsSup (R := em_le) y (dsup_em y)).
+
+      Local Instance em_dcpo_X : DCPO (convex_set X) :=
+        {|
+          lce := em_le;
+          lce_po := em_le_po;
+          dsup := @dsup_em X _;
+          dsup_is_sup := em_issup_X;
+        |}.
+
+      Local Instance em_dcpo_Y : DCPO (convex_set Y) :=
+        {|
+          lce := em_le;
+          lce_po := em_le_po;
+          dsup := @dsup_em Y _;
+          dsup_is_sup := em_issup_Y;
+        |}.
+
+      Lemma convex_map_kcont : KContinuous K (convex_map f).
+      Proof.
+        split.
+        - exact convex_map_mon.
+        - intros I x Dx Kx y Hy. apply (convex_map_dsup_em x). exact Hy.
+      Qed.
+    End CONVEX_MAP_KCONT_INSTANCE.
+  End CONVEX_MAP_KCONT.
+
 End EM_RELATIVE_MONAD.

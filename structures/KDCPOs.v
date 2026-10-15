@@ -310,4 +310,3 @@ Module WSDCPO_KDCPO_Inclusion (Ar : KArity).
   End JFaithful.
 
 End WSDCPO_KDCPO_Inclusion.
-
