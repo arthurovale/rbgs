@@ -259,6 +259,24 @@ Proof.
   exists i. intros j. apply Hi, Hbelow, dsup_ub.
 Qed.
 
+(** Consequently, a strict monotonic map out of a finitary DCPO is
+  Scott-continuous. *)
+
+Lemma finitary_sc {A B} `{DCPO A} `{!Finitary (R := lce (P := A))} `{DCPO B} (f : A -> B)
+    (Hmon : Monotonic f (lce ++> lce)) (Hbot : f bot = bot) :
+  ScottContinuous true f.
+Proof.
+  split; [exact Hmon |].
+  intros J HJ x Dx y Hy.
+  destruct (classic (inhabited J)) as [Hinh | Hemp].
+  - destruct (finitary_DCPO_acc x (inhabited0 := Hinh)) as [i Hi].
+    replace (dsup x) with (x i); [apply Hy |].
+    apply (antisymmetry (R := lce)); [apply dsup_ub | apply dsup_lub; exact Hi].
+  - replace (dsup x) with (@bot A _); [rewrite Hbot; apply bot_lb |].
+    apply (antisymmetry (R := lce)); [apply bot_lb |].
+    apply dsup_lub. intros j. exfalso. apply Hemp. exact (inhabits j).
+Qed.
+
 (** A key fact about finitary DCPOs is that any non-empty subset admits a maximal element *)
 
 Lemma finitary_DCPO_maximal `{DCPO} `{!Finitary (R := lce)} (A : P -> Prop) :

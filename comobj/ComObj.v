@@ -117,12 +117,12 @@ Section TVIS.
   Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
   Local Abbreviation id := (fun x => x).
 
-  Lemma tivs_tsil_retract : tvis_tsil ;; tsil_tvis = id.
+  Lemma tvis_tsil_retract : tvis_tsil ;; tsil_tvis = id.
   Proof.
     apply functional_extensionality. intros [ | [e s]]; reflexivity.
   Qed.
 
-  Lemma tivs_tsil_proj (t : Tsil E S) : lce ((tsil_tvis ;; tvis_tsil) t) t.
+  Lemma tvis_tsil_proj (t : Tsil E S) : lce ((tsil_tvis ;; tvis_tsil) t) t.
   Proof.
     destruct t as [| [[e |] s]]; cbn.
     - constructor.
@@ -130,5 +130,59 @@ Section TVIS.
     - constructor.
   Qed.
 
+  (** Both maps of the embedding-projection pair are strict Scott-continuous:
+    they are monotonic and strict, and both domains are finitary. *)
+
+  Lemma tvis_tsil_mon : Monotonic tvis_tsil (lce ++> lce).
+  Proof.
+    intros t u H. inversion H; subst; cbn; [constructor |].
+    destruct x as [e c], y as [e' c']; destruct H0 as [He Hc]; cbn in *; subst.
+    constructor. split; [reflexivity | exact Hc].
+  Qed.
+
+  Lemma tsil_tvis_mon : Monotonic tsil_tvis (lce ++> lce).
+  Proof.
+    intros t u H. inversion H; subst; cbn; [constructor |].
+    destruct x as [[e |] c], y as [[e' |] c']; destruct H0 as [He Hc]; cbn in *;
+      try discriminate He; try constructor.
+    injection He as <-. split; [reflexivity | exact Hc].
+  Qed.
+
+  (** The abstract [bot] of each domain is the constructor. *)
+  Lemma Tvis_bot : (bot : Tvis E S) = ⊥.
+  Proof. apply lift_bot_eq. Qed.
+
+  Lemma Tsil_bot : (bot : Tsil E S) = ⊥.
+  Proof. apply lift_bot_eq. Qed.
+
+  Global Instance tvis_tsil_sc : ScottContinuous true tvis_tsil.
+  Proof.
+    apply finitary_sc; [exact tvis_tsil_mon |].
+    rewrite Tvis_bot, Tsil_bot. reflexivity.
+  Qed.
+
+  Global Instance tsil_tvis_sc : ScottContinuous true tsil_tvis.
+  Proof.
+    apply finitary_sc; [exact tsil_tvis_mon |].
+    rewrite Tsil_bot, Tvis_bot. reflexivity.
+  Qed.
+
+  Definition behobj := S -> convex_set (Tvis E S).
+
+  Definition loud (α : comobj E S) : 
+    exists (α_vis : behobj), α_vis ;; convex_map tvis_tsil = α.
+
+  Lemma loud_unique {α : comobj E S} {α_vis : behobj} {α_vis' : behobj} : 
+    α_vis ;; convex_map tvis_tsil = α -> α_vis' ;; convex_map tvis_tsil = α
+      -> α_vis = α_vis'.
+  Proof.
+    intros H H'.  apply (f_equal (fun x => x ;; convex_map tsil_tvis)) in H, H'.
+    change (α_vis ;; (convex_map tvis_tsil ;; convex_map tsil_tvis) = α ;; convex_map tsil_tvis) in H.
+    change (α_vis' ;; (convex_map tvis_tsil ;; convex_map tsil_tvis) = α ;; convex_map tsil_tvis) in H'.
+    rewrite <- (convex_map_compose tsil_tvis tvis_tsil (Hg := tsil_tvis_mon)) in H, H'.
+    rewrite tvis_tsil_retract, convex_map_id in H, H'.
+    change (α_vis = α ;; convex_map tsil_tvis) in H.
+    change (α_vis' = α ;; convex_map tsil_tvis) in H'.
+    rewrite H, H'. reflexivity.
+  Qed.
 End TVIS.
-  
