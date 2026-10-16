@@ -1051,6 +1051,14 @@ Module Type CocartesianCategory :=
   Category.Category <+
   Cocartesian.
 
+(** ** Bicartesian category interface *)
+
+(** A bicartesian category is both cartesian and cocartesian. *)
+
+Module Type BicartesianCategory :=
+  CartesianCategory <+
+  Cocartesian.
+
 
 (** * Monoidal functors *)
 

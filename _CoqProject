@@ -7,6 +7,7 @@
 -R models models
 -R examples examples
 -R interfaces interfaces
+-R comobj comobj
 
 #structures/Completion.v
 #structures/Category.v
@@ -40,5 +41,10 @@ structures/Posets.v
 structures/SemiLattices.v
 structures/Lattices.v
 structures/DCPOs.v
+structures/DCPOExtra.v
 structures/KDCPOs.v
 structures/DCPOSLs.v
+
+# Communicating Objects
+comobj/AsyncEvents.v
+comobj/Sig.v
