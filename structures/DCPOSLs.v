@@ -80,6 +80,81 @@ Proof.
   - rewrite Hg. apply sup_lub. intros [[|]|]; unfold g'; cbn; assumption.
 Qed.
 
+(** ** Dependent products of DCPOSLs *)
+
+Section FORALL_DCPOSL.
+  Context {I} {L : I -> Type} `{Ldcposl : forall i : I, DCPOSL (L i)}.
+
+  Local Instance forall_ref_po :
+    @PartialOrder (forall i, L i) (forallr - @ i, ref).
+  Proof.
+    split.
+    - split.
+      + intros x i. reflexivity.
+      + intros x y z Hxy Hyz i. etransitivity; eauto.
+    - intros x y Hxy Hyx.
+      apply functional_extensionality_dep. intros i.
+      apply (antisymmetry (R := ref)); [apply Hxy | apply Hyx].
+  Qed.
+
+  Local Instance forall_poset : Poset (forall i, L i) :=
+    {
+      ref := forallr - @ i, ref;
+    }.
+
+  Local Obligation Tactic := idtac.
+
+  Global Program Instance forall_sl : SemiLattice (forall i, L i) :=
+    {
+      cdl_poset := forall_poset;
+      lsup J x := fun i => lsup (fun j => x j i);
+    }.
+  Next Obligation.
+    intros J u. split.
+    - intros j i. apply (sup_ub (IsSup := lsup_sup (fun j => u j i)) j).
+    - intros y Hy i. apply (sup_lub (IsSup := lsup_sup (fun j => u j i))). intros j. apply (Hy j i).
+  Qed.
+
+  (** Projecting a family of functions at a point preserves directedness. *)
+
+  Lemma forall_directed_at {J} (x : J -> forall i, L i) `{Dx : !Directed (R := lce) x} (i : I) :
+    Directed (R := lce) (fun j => x j i).
+  Proof.
+    intros j j'. destruct (Dx j j') as [u [H1 H2]]. exists u. split; [apply H1 | apply H2].
+  Qed.
+
+  Lemma forall_kdirected_at {K J} (x : J -> forall i, L i) `{Kx : !KDirected (R := lce) K x} (i : I) :
+    KDirected (R := lce) K (fun j => x j i).
+  Proof.
+    intros sel. destruct (Kx sel) as [u Hu]. exists u. intros k. apply (Hu k).
+  Qed.
+
+  Global Program Instance forall_dcposl : DCPOSL (forall i, L i) :=
+    {
+      dcposl_dcpo := _;
+      dcposl_sl := forall_sl;
+    }.
+  Next Obligation.
+    intros K. split.
+    - intros x y Hxy i. apply lsup_mon. intros k. apply (Hxy k i).
+    - intros J x Dx Kx y Hy i.
+      (* the family of components at [i] *)
+      assert (Dx' : Directed (R := lce) (fun j k => x j k i)).
+      { intros j j'. destruct (Dx j j') as [u [H1 H2]]. exists u.
+        split; intros k; [apply (H1 k i) | apply (H2 k i)]. }
+      assert (Kx' : KDirected (R := lce) K (fun j k => x j k i)).
+      { intros sel. destruct (Kx sel) as [u Hu]. exists u. intros k k'. apply (Hu k k' i). }
+      (* the two sides agree up to the directedness proof inside [dsup] *)
+      replace (lsup (dsup x) i) with (lsup (dsup (fun j k => x j k i))).
+      + apply (kc_lub (f := lsup (I := K)) (fun j k => x j k i)). intros j. apply (Hy j i).
+      + cbn. f_equal. apply functional_extensionality. intros k.
+        f_equal. apply proof_irrelevance.
+  Qed.
+End FORALL_DCPOSL.
+
+Global Hint Extern 1 (DCPOSL (forall i, _)) =>
+  eapply @forall_dcposl : typeclass_instances.
+
 (** A morphism of DCPOSLs is then a function that is simultaneously
   (strict) Scott cotinuous on the DCPO structure and a semilattice homomorphism 
   on the semilattice structure *)
