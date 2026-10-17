@@ -4,28 +4,28 @@ Require Import interfaces.MonoidalCategory.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
-(** * Asynchronous Events *)
+(** * Silent Events *)
 
-(** Asynchronous events are either a visible event or an invisible event. *)
+(** Silent events are either a visible event or an invisible event. *)
 
-(** ** First, we model asynchrony by implicitly considering epsilon moves
+(** ** First, we model silence by implicitly considering epsilon moves
   this is nicely achieved by using the lift monad *)
 
-Module AsyncEventsBase <: Category.
+Module SilentEventsBase <: Category.
 
   Definition t : Type := Type.
 
-  Inductive Async (T : Type) : Type :=
+  Inductive Sil (T : Type) : Type :=
   | vis (x : T)
   | ɛ.
   Arguments vis {T} x.
   Arguments ɛ {T}.
 
-  Notation "⇑ A" := (Async A) (at level 35).
+  Notation "⇑ A" := (Sil A) (at level 35).
   Notation "' x" := (vis x) (at level 9, x at next level).
 
   Definition m : t -> t -> Type :=
-      fun A => fun B => A -> Async B.
+      fun A => fun B => A -> Sil B.
 
   Program Definition id (A : t) : m A A := fun ev => 'ev.
 
@@ -59,15 +59,15 @@ Module AsyncEventsBase <: Category.
   Qed.
 
   Include CategoryTheory.
-End AsyncEventsBase.
+End SilentEventsBase.
 
-(** ** Bicartesian structure for AsyncEvents
-    We show that AsyncEvents has both products and coproducts. *)
-Module AsyncEventsBicartesian <: BicartesianCategory.
-  Include AsyncEventsBase.
+(** ** Bicartesian structure for SilentEvents
+    We show that SilentEvents has both products and coproducts. *)
+Module SilentEventsBicartesian <: BicartesianCategory.
+  Include SilentEventsBase.
 
   (** First we establish the cartesian (product) structure *)
-  Module Prod <: CartesianStructure AsyncEventsBase.
+  Module Prod <: CartesianStructure SilentEventsBase.
 
     (** Terminal object: Empty_set (any morphism to it must be ɛ) *)
     Definition unit : t := Empty_set : Type.
@@ -80,17 +80,17 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
       destruct (x ev) as [[] | ], (y ev) as [[] | ]; reflexivity.
     Qed.
 
-    Inductive asyncProd {A B : Type} : Type :=
+    Inductive silProd {A B : Type} : Type :=
     | sync (a : A) (b : B)
-    | asyncl (a : A)
-    | asyncr (b : B).
+    | sill (a : A)
+    | silr (b : B).
 
     (** Binary products: A × B *)
-    Definition omap (A B : Type) : Type := @asyncProd A B.
+    Definition omap (A B : Type) : Type := @silProd A B.
 
     Notation "⟨ a | b ⟩" := (sync a b) (at level 0).
-    Notation "⟨ a | ⟩" := (asyncl a) (at level 0).
-    Notation "⟨ | b ⟩" := (asyncr b) (at level 0).
+    Notation "⟨ a | ⟩" := (sill a) (at level 0).
+    Notation "⟨ | b ⟩" := (silr b) (at level 0).
 
     Definition p1 {A B : t} : m (omap A B) A :=
       fun obs =>
@@ -138,15 +138,15 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
       destruct (f ev) as [[a b | a | b] | ]. all: reflexivity.
     Qed.
 
-    Include CartesianStructureTheory AsyncEventsBase.
-    Include BifunctorTheory AsyncEventsBase AsyncEventsBase AsyncEventsBase.
-    Include SymmetricMonoidalStructureTheory AsyncEventsBase.
+    Include CartesianStructureTheory SilentEventsBase.
+    Include BifunctorTheory SilentEventsBase SilentEventsBase SilentEventsBase.
+    Include SymmetricMonoidalStructureTheory SilentEventsBase.
   End Prod.
 
-  Include CartesianTheory AsyncEventsBase.
+  Include CartesianTheory SilentEventsBase.
 
   (** Then we add the cocartesian (coproduct) structure *)
-  Module Plus <: CocartesianStructure AsyncEventsBase.
+  Module Plus <: CocartesianStructure SilentEventsBase.
 
     (** Initial object: Empty_set *)
     Definition unit : t := Empty_set : Type.
@@ -193,34 +193,34 @@ Module AsyncEventsBicartesian <: BicartesianCategory.
       destruct ab as [a | b]; reflexivity.
     Qed.
 
-    Include CocartesianStructureTheory AsyncEventsBase.
-    Include BifunctorTheory AsyncEventsBase AsyncEventsBase AsyncEventsBase.
-    Include SymmetricMonoidalStructureTheory AsyncEventsBase.
+    Include CocartesianStructureTheory SilentEventsBase.
+    Include BifunctorTheory SilentEventsBase SilentEventsBase SilentEventsBase.
+    Include SymmetricMonoidalStructureTheory SilentEventsBase.
   End Plus.
 
-  Include CocartesianTheory AsyncEventsBase.
+  Include CocartesianTheory SilentEventsBase.
 
-End AsyncEventsBicartesian.
+End SilentEventsBicartesian.
 
-Module AsyncEvents <: BicartesianCategory.
-  Include AsyncEventsBicartesian.
+Module SilentEvents <: BicartesianCategory.
+  Include SilentEventsBicartesian.
 
   Notation "⟨ a | b ⟩" := (Prod.sync a b) (at level 0).
-  Notation "⟨ a | ⟩" := (Prod.asyncl a) (at level 0).
-  Notation "⟨ | b ⟩" := (Prod.asyncr b) (at level 0).
+  Notation "⟨ a | ⟩" := (Prod.sill a) (at level 0).
+  Notation "⟨ | b ⟩" := (Prod.silr b) (at level 0).
 
-  Definition AsyncF {A B : Type} (f : A -> B) : ⇑A -> ⇑B :=
+  Definition SilF {A B : Type} (f : A -> B) : ⇑A -> ⇑B :=
     fun ev => 
       match ev with
       | 'a => '(f a)
       | ɛ => ɛ
       end.
 
-  Module AsyncF <: Functor SET SET.
+  Module SilF <: Functor SET SET.
     
-    Definition omap : Type -> Type := Async.
+    Definition omap : Type -> Type := Sil.
 
-    Definition fmap {A B : Type} : (A -> B) -> ⇑A -> ⇑B := AsyncF.
+    Definition fmap {A B : Type} : (A -> B) -> ⇑A -> ⇑B := SilF.
     
     Definition fmap_id :
       forall A, fmap (SET.id A) = SET.id (⇑A).
@@ -238,7 +238,7 @@ Module AsyncEvents <: BicartesianCategory.
     Qed.
 
     Include FunctorTheory SET SET.
-  End AsyncF.
+  End SilF.
 
   Definition ext {A B : Type} (f : A -> ⇑B) : ⇑A -> ⇑B :=
   fun ev =>
@@ -247,8 +247,8 @@ Module AsyncEvents <: BicartesianCategory.
     | ɛ => ɛ
     end.
 
-  Module Ext <: FaithfulFunctor AsyncEventsBase SET.
-      Definition omap : Type -> Type := Async.
+  Module Ext <: FaithfulFunctor SilentEventsBase SET.
+      Definition omap : Type -> Type := Sil.
 
       Definition fmap {A B : Type} : 
         (A -> ⇑B) -> ⇑A -> ⇑B := ext.
@@ -269,7 +269,7 @@ Module AsyncEvents <: BicartesianCategory.
         destruct (f a) as [b | ]; reflexivity.
       Qed.
 
-      Include FunctorTheory AsyncEventsBase SET.
+      Include FunctorTheory SilentEventsBase SET.
 
       Proposition faithful : forall {A B} 
         (f g : A -> ⇑B), ext f = ext g -> f = g. 
@@ -291,4 +291,4 @@ Module AsyncEvents <: BicartesianCategory.
       destruct x; destruct y; reflexivity.
     Qed.
 
-End AsyncEvents.
+End SilentEvents.

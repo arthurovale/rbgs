@@ -3,17 +3,17 @@ Require Import interfaces.Functor.
 Require Import interfaces.MonoidalCategory.
 Require Import interfaces.Limits.
 
-Require Import AsyncEvents.
+Require Import SilentEvents.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
 (** * Polarized Signatures *)
 
-(** ** A Polarized signature is a pair of two asynchronous event sets
+(** ** A Polarized signature is a pair of two silent event sets
   [(A^-, A^+)]. A "base" morphism of signatures is a pair of
-  asynchronous morphisms f^- : A^- -> B^- and f^+ : A^+ -> B^+ *)
+  silent morphisms f^- : A^- -> B^- and f^+ : A^+ -> B^+ *)
 Module SigBase <: Category.
-  Import AsyncEvents.
+  Import SilentEvents.
 
   Definition t : Type := Type * Type.
 
@@ -22,7 +22,7 @@ Module SigBase <: Category.
 
   Definition m : t -> t -> Type :=
     fun A => fun B =>
-      ((AsyncEvents.m A^- B^-) * (AsyncEvents.m A^+ B^+))%type.
+      ((SilentEvents.m A^- B^-) * (SilentEvents.m A^+ B^+))%type.
 
   Definition id (A : t) : m A A := (id A^-, id A^+).
 
@@ -33,14 +33,14 @@ Module SigBase <: Category.
     forall {A B} (f : m A B), compose (id B) f = f.
   Proof.
     intros; apply injective_projections; 
-    apply AsyncEvents.compose_id_left.
+    apply SilentEvents.compose_id_left.
   Qed.
 
   Proposition compose_id_right :
     forall {A B} (f : m A B), compose f (id A) = f.
   Proof.
     intros; apply injective_projections; 
-    apply AsyncEvents.compose_id_right.
+    apply SilentEvents.compose_id_right.
   Qed.
 
   Proposition compose_assoc :
@@ -48,7 +48,7 @@ Module SigBase <: Category.
     compose (compose h g) f = compose h (compose g f).
   Proof.
     intros; apply injective_projections; 
-    apply AsyncEvents.compose_assoc.
+    apply SilentEvents.compose_assoc.
   Qed.
 
   Include CategoryTheory.
@@ -57,7 +57,7 @@ End SigBase.
 (** ** Bicartesian structure for SigBase
     We show that SigBase has both products and coproducts. *)
 Module SigBaseBicartesian <: BicartesianCategory.
-  Import AsyncEvents.
+  Import SilentEvents.
   Include SigBase.
 
   (** First we establish the cartesian (product) structure *)
@@ -187,10 +187,10 @@ Module Sig <: BicartesianCategory.
     and [«A -o B» + ɛ] for OALTS *)
   Delimit Scope event_obj_scope with event_obj.
   Delimit Scope event_hom_scope with event_hom.
-  Notation "« f »" := (AsyncEvents.Prod.fmap f^- f^+) : event_hom_scope.
-  Notation "« A »" := (AsyncEvents.Prod.omap A^- A^+) : event_obj_scope.
+  Notation "« f »" := (SilentEvents.Prod.fmap f^- f^+) : event_hom_scope.
+  Notation "« A »" := (SilentEvents.Prod.omap A^- A^+) : event_obj_scope.
 
-  Module ProdF <: Functor SigBaseBicartesian AsyncEvents.
+  Module ProdF <: Functor SigBaseBicartesian SilentEvents.
 
     Open Scope event_hom_scope.
 
@@ -199,28 +199,28 @@ Module Sig <: BicartesianCategory.
     Definition fmap {A B : sig} (f : m A B) := «f».
 
     Proposition fmap_id :
-      forall A, «id A» = AsyncEvents.id («A»%event_obj).
+      forall A, «id A» = SilentEvents.id («A»%event_obj).
     Proof.
-      intros. rewrite AsyncEvents.Prod.fmap_id. reflexivity.
+      intros. rewrite SilentEvents.Prod.fmap_id. reflexivity.
     Qed.
 
     Proposition fmap_compose :
       forall {A B C} (g : m B C) (f : m A B),
-        «(g @ f)» = AsyncEvents.compose «g» «f».
+        «(g @ f)» = SilentEvents.compose «g» «f».
     Proof.
       intros. unfold compose; simpl.
-      rewrite AsyncEvents.Prod.fmap_compose. reflexivity.
+      rewrite SilentEvents.Prod.fmap_compose. reflexivity.
     Qed.
 
-    Include FunctorTheory SigBaseBicartesian AsyncEvents.
+    Include FunctorTheory SigBaseBicartesian SilentEvents.
   End ProdF.
 
   (** In certain circumstnces, we will want to match on postive and
     negative events of [A] so we define special notation for that purpose. *)
-  Notation "[ f ]" := (AsyncEvents.Plus.fmap f^- f^+) : event_hom_scope.
-  Notation "[ A ]" := (AsyncEvents.Plus.omap (fst A%sig) (snd A%sig)) : event_obj_scope.
+  Notation "[ f ]" := (SilentEvents.Plus.fmap f^- f^+) : event_hom_scope.
+  Notation "[ A ]" := (SilentEvents.Plus.omap (fst A%sig) (snd A%sig)) : event_obj_scope.
 
-  Module PlusF <: Functor SigBaseBicartesian AsyncEvents.
+  Module PlusF <: Functor SigBaseBicartesian SilentEvents.
 
     Open Scope event_hom_scope.
 
@@ -229,23 +229,23 @@ Module Sig <: BicartesianCategory.
     Definition fmap {A B : sig} (f : Sig.m A B) := [f].
 
     Proposition fmap_id :
-      forall A, [id A] = AsyncEvents.id ([A]%event_obj).
+      forall A, [id A] = SilentEvents.id ([A]%event_obj).
     Proof.
-      intros. rewrite AsyncEvents.Plus.fmap_id. reflexivity.
+      intros. rewrite SilentEvents.Plus.fmap_id. reflexivity.
     Qed.
 
     Proposition fmap_compose :
       forall {A B C} (g : m B C) (f : m A B),
-        [(g @ f)] = AsyncEvents.compose [g] [f].
+        [(g @ f)] = SilentEvents.compose [g] [f].
     Proof.
       intros. unfold compose; simpl.
-      rewrite AsyncEvents.Plus.fmap_compose. reflexivity.
+      rewrite SilentEvents.Plus.fmap_compose. reflexivity.
     Qed.
 
-    Include FunctorTheory SigBaseBicartesian AsyncEvents.
+    Include FunctorTheory SigBaseBicartesian SilentEvents.
   End PlusF.
 
-  (** Events in [[A && B]] are a sum of two asyncProds:
+  (** Events in [[A && B]] are a sum of two silProds:
 
     [A && B = A && B = (A^- && B^-, A^+ && B^+)]
     [[A && B] = (A^- && B^-) + (A^+ && B^+)]
@@ -274,7 +274,7 @@ Module Sig <: BicartesianCategory.
   (** At this point, we can define projections of events of [A -o B] to 
     events of [A] and [B] *)
   Section Projections.
-    Import AsyncEvents.
+    Import SilentEvents.
 
     Local Open Scope event_obj_scope.
     
@@ -307,39 +307,38 @@ Module Sig <: BicartesianCategory.
   End Projections.
 
   Tactic Notation "unfold_projL" := 
-        (unfold projL, AsyncEvents.Plus.fmap, 
-              AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-              AsyncEvents.Prod.p1,
-              AsyncEvents.compose, AsyncEvents.Plus.copair; simpl).
+        (unfold projL, SilentEvents.Plus.fmap, 
+              SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+              SilentEvents.Prod.p1,
+              SilentEvents.compose, SilentEvents.Plus.copair; simpl).
 
   Tactic Notation "unfold_projL" "in" hyp(H) := 
-    (unfold projL, AsyncEvents.Plus.fmap, 
-          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-          AsyncEvents.Prod.p1,
-          AsyncEvents.compose, AsyncEvents.Plus.copair in H; simpl in H).
+    (unfold projL, SilentEvents.Plus.fmap, 
+          SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+          SilentEvents.Prod.p1,
+          SilentEvents.compose, SilentEvents.Plus.copair in H; simpl in H).
 
   Tactic Notation "unfold_projR" := 
-    (unfold projR, AsyncEvents.Plus.fmap, 
-          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-          AsyncEvents.Prod.p2,
-          AsyncEvents.compose, AsyncEvents.Plus.copair; simpl).
+    (unfold projR, SilentEvents.Plus.fmap, 
+          SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+          SilentEvents.Prod.p2,
+          SilentEvents.compose, SilentEvents.Plus.copair; simpl).
 
   Tactic Notation "unfold_projR" "in" hyp(H) := 
-    (unfold projR, AsyncEvents.Plus.fmap, 
-          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-          AsyncEvents.Prod.p2,
-          AsyncEvents.compose, AsyncEvents.Plus.copair in H; simpl in H).
+    (unfold projR, SilentEvents.Plus.fmap, 
+          SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+          SilentEvents.Prod.p2,
+          SilentEvents.compose, SilentEvents.Plus.copair in H; simpl in H).
 
   Tactic Notation "unfold_proj" := 
-    (unfold projL, projR, AsyncEvents.Plus.fmap, 
-          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-          AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
-          AsyncEvents.compose, AsyncEvents.Plus.copair; simpl).
+    (unfold projL, projR, SilentEvents.Plus.fmap, 
+          SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+          SilentEvents.Prod.p1, SilentEvents.Prod.p2,
+          SilentEvents.compose, SilentEvents.Plus.copair; simpl).
 
   Tactic Notation "unfold_proj" "in" hyp(H) := 
-    (unfold projL, projR, AsyncEvents.Plus.fmap, 
-          AsyncEvents.Plus.i1, AsyncEvents.Plus.i2,
-          AsyncEvents.Prod.p1, AsyncEvents.Prod.p2,
-          AsyncEvents.compose, AsyncEvents.Plus.copair in H; simpl in H).
-              
+    (unfold projL, projR, SilentEvents.Plus.fmap, 
+          SilentEvents.Plus.i1, SilentEvents.Plus.i2,
+          SilentEvents.Prod.p1, SilentEvents.Prod.p2,
+          SilentEvents.compose, SilentEvents.Plus.copair in H; simpl in H).
 End Sig.

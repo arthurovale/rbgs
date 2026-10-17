@@ -114,13 +114,11 @@ Qed.
 
 (** *** Least element *)
 
-Definition bot `{DCPO} :=
-  dsup (Empty_set_rect _).
-
-Lemma bot_lb `{DCPO} x :
-  lce bot x.
-Proof.
-  apply sup_lub. tauto.
+(** The supremum of the empty family is the least element. *)
+Global Program Instance dcpo_pointed `{DCPO} : Pointed lce :=
+  {| bot := dsup (Empty_set_rect _) |}.
+Next Obligation.
+  intros. apply sup_lub. tauto.
 Qed.
 
 Lemma lce_bot_eq `{DCPO} x :
@@ -301,8 +299,11 @@ Section FORALL_DCPO.
 
 End FORALL_DCPO.
 
+(** The goal must syntactically be a product: an unknown carrier would
+  otherwise unify with [forall i, ?P i] and send instance search into a
+  loop through ever more nested products. *)
 Global Hint Extern 1 (DCPO (forall i, _)) =>
-  eapply @forall_dcpo : typeclass_instances.
+  lazymatch goal with |- DCPO (forall _, _) => eapply @forall_dcpo end : typeclass_instances.
 
 (** ** Scott-continuous functions *)
 

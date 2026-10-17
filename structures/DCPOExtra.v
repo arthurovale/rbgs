@@ -1,10 +1,14 @@
 Require Import coqrel.LogicalRelations.
 Require Import Stdlib.Logic.Classical.
 Require Import Stdlib.Logic.ClassicalEpsilon.
+Require Import Stdlib.Logic.ClassicalChoice.
+Require Import Stdlib.Lists.List.
+Require Import Stdlib.Arith.PeanoNat.
 Require Import structures.Posets.
 Require Import structures.DCPOs.
+Require Import structures.KDCPOs.
 
-(** * Directed completeness without a least element *)
+(** * DCPOs without a least element *)
 
 Class DirectedComplete `{PartialOrder} :=
   dcomplete : forall {I} (x : I -> P), inhabited I -> Directed x -> exists u, IsSup x u.
@@ -25,6 +29,27 @@ Global Instance dcpo_dcomplete `{DCPO} : DirectedComplete (R := lce).
 Proof.
   intros I x _ Hx. exists (dsup x). apply dsup_is_sup.
 Qed.
+
+(** * Strict maps *)
+
+(** A map between DCPOs is strict when it preserves the least element. *)
+
+Class Strict {A B} `{Adcpo : DCPO A} `{Bdcpo : DCPO B} (f : A -> B) :=
+  strict_bot : f bot = bot.
+
+Lemma strict_lb {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!Strict f} (y : B) :
+  lce (f bot) y.
+Proof.
+  rewrite (strict_bot (f := f)). apply bot_lb.
+Qed.
+
+(** Strict Scott-continuity implies strictness. *)
+Global Instance sc_strict {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!ScottContinuous true f} :
+  Strict f := sc_bot.
+
+(** So does [K]-continuity for inhabited [K]. *)
+Definition kcont_strict {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B} (f : A -> B)
+    `{!KContinuous K f} : Strict f := kc_strict inK f.
 
 Section PROD.
   Context {P Q : Type} {R : relation P} {S : relation Q}
@@ -170,37 +195,50 @@ Section LIFT.
   Qed.
 End LIFT.
 
+(** The lift instances are only tried on goals syntactically about a [lift],
+  for the same reason as the Egli-Milner instances in [DCPOSLs]. *)
+#[global] Remove Hints lift_po lift_dcpo : typeclass_instances.
+Global Hint Extern 1 (PartialOrder (@lift_lce _ _)) => simple eapply @lift_po : typeclass_instances.
+Global Hint Extern 1 (DCPO (lift _ _)) => simple eapply @lift_dcpo : typeclass_instances.
+
 (** * Kleisli extension *)
 
 Section LIFT_EXT.
   Context `{PartialOrder} `{!DirectedComplete} {D} `{Ddcpo : DCPO D}.
 
-  Definition ext (f : P -> D) (t : lift P R) : D :=
+  Definition lift_ext (f : P -> D) (t : lift P R) : D :=
     match t with
     | lift_bot => bot
     | lift_el x => f x
     end.
 
-  Lemma ext_emb (f : P -> D) (x : P) :
-    ext f (lift_el x) = f x.
+  Lemma lift_ext_el (f : P -> D) (x : P) :
+    lift_ext f (lift_el x) = f x.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma ext_bot (f : P -> D) :
-    ext f bot = bot.
+  Global Instance lift_ext_strict (f : P -> D) : Strict (lift_ext f).
   Proof.
-    rewrite lift_bot_eq. reflexivity.
+    unfold Strict. rewrite lift_bot_eq. reflexivity.
   Qed.
 
-  (** [ext f] is strict Scott-continuous as soon as [f] is monotonic and
+  (** [lift_ext] is monotone in the extended map, pointwise. *)
+  Lemma lift_ext_mon_r (g g' : P -> D) :
+    (forall p, lce (g p) (g' p)) ->
+    forall t, lce (lift_ext g t) (lift_ext g' t).
+  Proof.
+    intros Hg [| p]; [reflexivity | apply Hg].
+  Qed.
+
+  (** [lift_ext f] is strict Scott-continuous as soon as [f] is monotonic and
     preserves the suprema of inhabited directed families. *)
 
-  Lemma ext_sc (f : P -> D)
+  Lemma lift_ext_sc (f : P -> D)
       (Hmon : Monotonic f (R ++> lce))
       (Hsup : forall {I} (x : I -> P) (u : P), inhabited I -> Directed x -> IsSup x u ->
                 forall y, (forall i, lce (f (x i)) y) -> lce (f u) y) :
-    ScottContinuous true (ext f).
+    ScottContinuous true (lift_ext f).
   Proof.
     split.
     - intros t u Htu. change (lift_lce t u) in Htu.
@@ -215,10 +253,10 @@ End LIFT_EXT.
 
 (** ** The flat domain: every function out of a set extends. *)
 
-Global Instance flat_ext_sc {X D} `{DCPO D} (f : X -> D) :
-  ScottContinuous true (ext (R := eq) f).
+Global Instance lift_ext_flat_sc {X D} `{DCPO D} (f : X -> D) :
+  ScottContinuous true (lift_ext (R := eq) f).
 Proof.
-  apply ext_sc.
+  apply lift_ext_sc.
   - intros a b ->. reflexivity.
   - intros I x u [i] Hx Hu y Hy.
     pose proof (sup_ub (IsSup := Hu) i) as <-. apply Hy.
@@ -226,10 +264,10 @@ Qed.
 
 (** ** The lift monad: non-strict continuous maps extend to strict ones. *)
 
-Global Instance lift_ext_sc {P D} `{DCPO P} `{DCPO D} (f : P -> D) `{!ScottContinuous false f} :
-  ScottContinuous true (ext (R := lce) f).
+Global Instance lift_ext_dcpo_sc {P D} `{DCPO P} `{DCPO D} (f : P -> D) `{!ScottContinuous false f} :
+  ScottContinuous true (lift_ext (R := lce) f).
 Proof.
-  apply ext_sc.
+  apply lift_ext_sc.
   - apply sc_lce.
   - intros I x u HI Hx Hu y Hy.
     replace u with (dsup x).
@@ -239,3 +277,135 @@ Proof.
       * apply (sup_lub (IsSup := Hu)). apply dsup_ub.
 Qed.
 
+(** * Finitary DCPOs *)
+
+(** A DCPO is finitary when every element has finitely many elements below
+  it. Finitary DCPOs are used to build DCPOSLs out of DCPOs. *)
+
+Class Finitary `{PartialOrder} := 
+  finitary : forall d : P, exists l : list P, forall a, R a d <-> In a l.  
+
+(** Instance search for [Finitary] must know the relation: otherwise
+  [lift_finitary] below applies to itself indefinitely. *)
+Global Hint Mode Finitary - ! - : typeclass_instances.
+
+(** From a point-of-view of partial orders as causal structures, this condition 
+may be read as stating that every piece of information is can be justified 
+by a finite amount of past information. *)
+
+(** So we may use the finitary assumption effectively, we note that in any DCPO,
+  any finite subset of a directed set admits an upper bound in the directed set.
+  This generalizes the directedness property state on pairs to finite sets.  *)
+
+Lemma directed_bounded_in `{DCPO} {I} `{inhabited I} (x : I -> P) `{Dx : !Directed x} (l : list P) :
+  exists i, forall j, In (x j) l -> lce (x j) (x i).
+Proof.
+  destruct inhabited0 as [i0].
+  induction l as [| a l IH].
+  - exists i0. intros j [].
+  - destruct IH as [i Hi].
+    destruct (classic (exists j0, x j0 = a)) as [[j0 Hj0] | Hno].
+    + destruct (Dx j0 i) as [k [Hj0k Hik]].
+      exists k. intros j [Ha | Hl].
+      * rewrite <- Ha, <- Hj0. exact Hj0k.
+      * transitivity (x i); auto.
+    + exists i. intros j [Ha | Hl].
+      * destruct Hno. exists j. auto.
+      * auto.
+Qed.
+
+(** **** Finitary DCPOs satisfy the ascending chain condition. *)
+
+(** First, note that ascending chains are directed sets *)
+
+Lemma monotone_seq_directed `{DCPO} (g : nat -> P) :
+  (forall n, lce (g n) (g (S n))) -> Directed g.
+Proof.
+  intros Hg.
+  assert (Hmon : forall n m, (n <= m)%nat -> lce (g n) (g m)).
+  { intros n m Hnm. induction Hnm. reflexivity. transitivity (g m); auto. }
+  intros n m. exists (Nat.max n m).
+  split; apply Hmon. apply Nat.le_max_l. apply Nat.le_max_r.
+Qed.
+
+(** So we prove the following generalization of the ascending chain condition *)
+
+Lemma finitary_DCPO_acc `{DCPO} `{!Finitary (R := lce)} {I} `{inhabited I} (x : I -> P) `{!Directed x} :
+  exists i, forall j, lce (x j) (x i).
+Proof.
+  destruct (finitary (dsup x)) as [below Hbelow].
+  destruct (directed_bounded_in (inhabited0 := inhabited0)  x below) as [i Hi].
+  exists i. intros j. apply Hi, Hbelow, dsup_ub.
+Qed.
+
+(** Consequently, a strict monotonic map out of a finitary DCPO is
+  Scott-continuous. *)
+
+Lemma finitary_sc {A B} `{DCPO A} `{!Finitary (R := lce (P := A))} `{DCPO B} (f : A -> B)
+    (Hmon : Monotonic f (lce ++> lce)) `{!Strict f} :
+  ScottContinuous true f.
+Proof.
+  split; [exact Hmon |].
+  intros J HJ x Dx y Hy.
+  destruct (classic (inhabited J)) as [Hinh | Hemp].
+  - destruct (finitary_DCPO_acc x (inhabited0 := Hinh)) as [i Hi].
+    replace (dsup x) with (x i); [apply Hy |].
+    apply (antisymmetry (R := lce)); [apply dsup_ub | apply dsup_lub; exact Hi].
+  - replace (dsup x) with (bot : A); [rewrite (strict_bot (f := f)); apply bot_lb |].
+    apply (antisymmetry (R := lce)); [apply bot_lb |].
+    apply dsup_lub. intros j. exfalso. apply Hemp. exact (inhabits j).
+Qed.
+
+(** A key fact about finitary DCPOs is that any non-empty subset admits a maximal element *)
+
+Lemma finitary_DCPO_maximal `{DCPO} `{!Finitary (R := lce)} (A : P -> Prop) :
+  (exists b, A b) ->
+  exists b, A b /\ forall b', A b' -> lce b b' -> b = b'.
+Proof.
+  intros [b0 Hb0].
+  destruct (classic (exists b, A b /\ forall b', A b' -> lce b b' -> b = b'))
+    as [Hmax | Hno]; [assumption | exfalso].
+  (* every element of A has a strict successor in A *)
+  assert (Hstep : forall b, exists b', A b -> A b' /\ lce b b' /\ b <> b').
+  { intros b. destruct (classic (A b)) as [Hb | Hb].
+    - apply NNPP. intros Hn. apply Hno. exists b. split; auto.
+      intros b' Hb' Hle. apply NNPP. intros Hneq. apply Hn. exists b'. auto.
+    - exists b. tauto. }
+  destruct (choice _ Hstep) as [f Hf].
+  pose (g := nat_rect (fun _ => P) b0 (fun _ b => f b)).
+  assert (HgS : forall n, A (g n)).
+  { induction n; cbn. assumption. apply Hf; assumption. }
+  assert (Hg : forall n, lce (g n) (g (S n)) /\ g n <> g (S n)).
+  { intros n. apply Hf, HgS. }
+  pose proof (monotone_seq_directed g (fun n => proj1 (Hg n))) as Hdir.
+  destruct (finitary_DCPO_acc (inhabited0 := inhabits 0) g) as [i Hi].
+  destruct (Hg i) as [Hle Hneq].
+  apply Hneq, antisymmetry; auto.
+Qed.
+
+(** ** Finitary instances *)
+
+(** A discrete order is finitary, and so is the lift of a finitary order. *)
+
+Global Instance eq_finitary (X : Type) : Finitary (R := @eq X) | 10.
+Proof.
+  intros d. exists (cons d nil). intros a. split.
+  - intros ->. left. reflexivity.
+  - intros [<- | []]. reflexivity.
+Qed.
+
+Global Instance lift_finitary {P R} `{PartialOrder P R} `{!DirectedComplete (R := R)}
+    `{!Finitary (R := R)} :
+  Finitary (R := lce (P := lift P R)).
+Proof.
+  intros d. destruct d as [| p].
+  - exists (cons lift_bot nil). intros x. split.
+    + intros H'. inversion H'; subst. left. reflexivity.
+    + intros [<- | []]. constructor.
+  - destruct (finitary p) as [l Hl].
+    exists (cons lift_bot (map lift_el l)). intros x. split.
+    + intros H'. inversion H' as [| x' y' Hp]; subst; [left; reflexivity |].
+      right. apply in_map_iff. exists x'. split; [reflexivity | apply Hl; exact Hp].
+    + intros [<- | Hin]; [constructor |].
+      apply in_map_iff in Hin. destruct Hin as [p' [<- Hp']]. constructor. apply Hl. exact Hp'.
+Qed.

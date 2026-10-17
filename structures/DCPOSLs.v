@@ -4,6 +4,7 @@ Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.SemiLattices.
 Require Import structures.KDCPOs.
+Require Import structures.DCPOExtra.
 
 Require Import Stdlib.Program.Program.
 Require Import Stdlib.Logic.PropExtensionality.
@@ -43,6 +44,11 @@ Class DCPOSL (L : Type) :=
     dcposl_sl :: SemiLattice L;
     sup_kcont {K} :: KContinuous K (lsup (L := L) (I := K));
   }.
+
+(** The join order of a semilattice is pointed by [lbot]. It gets a low
+  priority so that an unannotated [bot] on a DCPOSL means the [lce] bottom. *)
+Global Instance sl_pointed `{SemiLattice} : Pointed ref | 10 :=
+  {| bot := lbot; bot_lb := lbot_lb |}.
 
 (** The [kc_lce] component of [sup_kcont] in pointwise form *)
 Lemma lsup_mon `{DCPOSL} {K} (u v : K -> L) :
@@ -152,8 +158,14 @@ Section FORALL_DCPOSL.
   Qed.
 End FORALL_DCPOSL.
 
+(** As for [forall_dcpo], the goal must syntactically be a product. The
+  instances registered automatically by [Global Instance] are removed, since
+  they would unify an unknown carrier with a product. *)
+#[global] Remove Hints forall_sl forall_dcposl : typeclass_instances.
+Global Hint Extern 1 (SemiLattice (forall i, _)) =>
+  lazymatch goal with |- SemiLattice (forall _, _) => eapply @forall_sl end : typeclass_instances.
 Global Hint Extern 1 (DCPOSL (forall i, _)) =>
-  eapply @forall_dcposl : typeclass_instances.
+  lazymatch goal with |- DCPOSL (forall _, _) => eapply @forall_dcposl end : typeclass_instances.
 
 (** A morphism of DCPOSLs is then a function that is simultaneously
   (strict) Scott cotinuous on the DCPO structure and a semilattice homomorphism 
@@ -201,108 +213,6 @@ Module DCPOSL (Ar : KArity) <: ConcreteCategory.
   Include ConcreteCategoryTheory.
 
 End DCPOSL.
-
-(** ** Finitary DCPOs *)
-
-(** To construct a class of DCPOSLs associated to DCPOs we will assume 
-  the underlying DCPO is finitary in the following sense *)
-
-Class Finitary `{PartialOrder} := 
-  finitary : forall d : P, exists l : list P, forall a, R a d <-> In a l.  
-
-(** From a point-of-view of partial orders as causal structures, this condition 
-may be read as stating that every piece of information is can be justified 
-by a finite amount of past information. *)
-
-(** So we may use the finitary assumption effectively, we note that in any DCPO,
-  any finite subset of a directed set admits an upper bound in the directed set.
-  This generalizes the directedness property state on pairs to finite sets.  *)
-
-Lemma directed_bounded_in `{DCPO} {I} `{inhabited I} (x : I -> P) `{Dx : !Directed x} (l : list P) :
-  exists i, forall j, In (x j) l -> lce (x j) (x i).
-Proof.
-  destruct inhabited0 as [i0].
-  induction l as [| a l IH].
-  - exists i0. intros j [].
-  - destruct IH as [i Hi].
-    destruct (classic (exists j0, x j0 = a)) as [[j0 Hj0] | Hno].
-    + destruct (Dx j0 i) as [k [Hj0k Hik]].
-      exists k. intros j [Ha | Hl].
-      * rewrite <- Ha, <- Hj0. exact Hj0k.
-      * transitivity (x i); auto.
-    + exists i. intros j [Ha | Hl].
-      * destruct Hno. exists j. auto.
-      * auto.
-Qed.
-
-(** **** Finitary DCPOs satisfy the ascending chain condition. *)
-
-(** First, note that ascending chains are directed sets *)
-
-Lemma monotone_seq_directed `{DCPO} (g : nat -> P) :
-  (forall n, lce (g n) (g (S n))) -> Directed g.
-Proof.
-  intros Hg.
-  assert (Hmon : forall n m, (n <= m)%nat -> lce (g n) (g m)).
-  { intros n m Hnm. induction Hnm. reflexivity. transitivity (g m); auto. }
-  intros n m. exists (Nat.max n m).
-  split; apply Hmon. apply Nat.le_max_l. apply Nat.le_max_r.
-Qed.
-
-(** So we prove the following generalization of the ascending chain condition *)
-
-Lemma finitary_DCPO_acc `{DCPO} `{!Finitary (R := lce)} {I} `{inhabited I} (x : I -> P) `{!Directed x} :
-  exists i, forall j, lce (x j) (x i).
-Proof.
-  destruct (finitary (dsup x)) as [below Hbelow].
-  destruct (directed_bounded_in (inhabited0 := inhabited0)  x below) as [i Hi].
-  exists i. intros j. apply Hi, Hbelow, dsup_ub.
-Qed.
-
-(** Consequently, a strict monotonic map out of a finitary DCPO is
-  Scott-continuous. *)
-
-Lemma finitary_sc {A B} `{DCPO A} `{!Finitary (R := lce (P := A))} `{DCPO B} (f : A -> B)
-    (Hmon : Monotonic f (lce ++> lce)) (Hbot : f bot = bot) :
-  ScottContinuous true f.
-Proof.
-  split; [exact Hmon |].
-  intros J HJ x Dx y Hy.
-  destruct (classic (inhabited J)) as [Hinh | Hemp].
-  - destruct (finitary_DCPO_acc x (inhabited0 := Hinh)) as [i Hi].
-    replace (dsup x) with (x i); [apply Hy |].
-    apply (antisymmetry (R := lce)); [apply dsup_ub | apply dsup_lub; exact Hi].
-  - replace (dsup x) with (@bot A _); [rewrite Hbot; apply bot_lb |].
-    apply (antisymmetry (R := lce)); [apply bot_lb |].
-    apply dsup_lub. intros j. exfalso. apply Hemp. exact (inhabits j).
-Qed.
-
-(** A key fact about finitary DCPOs is that any non-empty subset admits a maximal element *)
-
-Lemma finitary_DCPO_maximal `{DCPO} `{!Finitary (R := lce)} (A : P -> Prop) :
-  (exists b, A b) ->
-  exists b, A b /\ forall b', A b' -> lce b b' -> b = b'.
-Proof.
-  intros [b0 Hb0].
-  destruct (classic (exists b, A b /\ forall b', A b' -> lce b b' -> b = b'))
-    as [Hmax | Hno]; [assumption | exfalso].
-  (* every element of A has a strict successor in A *)
-  assert (Hstep : forall b, exists b', A b -> A b' /\ lce b b' /\ b <> b').
-  { intros b. destruct (classic (A b)) as [Hb | Hb].
-    - apply NNPP. intros Hn. apply Hno. exists b. split; auto.
-      intros b' Hb' Hle. apply NNPP. intros Hneq. apply Hn. exists b'. auto.
-    - exists b. tauto. }
-  destruct (choice _ Hstep) as [f Hf].
-  pose (g := nat_rect (fun _ => P) b0 (fun _ b => f b)).
-  assert (HgS : forall n, A (g n)).
-  { induction n; cbn. assumption. apply Hf; assumption. }
-  assert (Hg : forall n, lce (g n) (g (S n)) /\ g n <> g (S n)).
-  { intros n. apply Hf, HgS. }
-  pose proof (monotone_seq_directed g (fun n => proj1 (Hg n))) as Hdir.
-  destruct (finitary_DCPO_acc (inhabited0 := inhabits 0) g) as [i Hi].
-  destruct (Hg i) as [Hle Hneq].
-  apply Hneq, antisymmetry; auto.
-Qed.
 
 (** ** The Egli-Milner Power Domain *)
 
@@ -534,6 +444,10 @@ Section EGLI_MILNER_DOMAIN.
   Proof.
     split; typeclasses eauto.
   Qed.
+
+  (** The EM order is pointed by [div_set], with no further assumption on [P]. *)
+  Global Instance em_pointed : Pointed em_le :=
+    {| bot := div_set; bot_lb := div_set_bot |}.
 
   (** the supremum is the set of all elements that are eventually always present *)
   (** bot is only present if it never gets removed *)
@@ -948,6 +862,14 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 End EGLI_MILNER_DOMAIN.
 
+(** The Egli-Milner instances are only tried on goals that are syntactically
+  about a [convex_set]. As plain instances they would also apply to a goal
+  with an unknown carrier, producing ever larger domains [convex_set ?Q] and
+  sending instance search into a loop. *)
+#[global] Remove Hints em_dcpo em_dcposl : typeclass_instances.
+Global Hint Extern 1 (DCPO (convex_set _)) => simple eapply @em_dcpo : typeclass_instances.
+Global Hint Extern 1 (DCPOSL (convex_set _)) => simple eapply @em_dcposl : typeclass_instances.
+
 (** ** Free DCPOSL *)
 
 (* I could define the forgetful functor and use the derived Universal class from 
@@ -959,11 +881,11 @@ Class IsFDCPOSL (K : Type) (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} 
     emb_sc :: ScottContinuous true emb;
     ext {D} `{Ddcposl : DCPOSL D} : (P -> D) -> F -> D;
 
-    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y} ::
+    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f} ::
       DCPOSLMorphism K (ext f);
-    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y} :
+    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f} :
       forall p, ext f (emb p) = f p;
-    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y}
+    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f}
       (g : F -> D) `{Hg : !DCPOSLMorphism K g} :
       (forall p, g (emb p) = f p) -> forall x, g x = ext f x;
   }.
@@ -1047,18 +969,61 @@ Section EM_EMB_EXT.
   Qed.
 End EM_EMB_EXT.
 
+(** *** Set notations for convex sets *)
+
+Notation "{{-}}" := em_emb.
+Notation "{{ x }}" := (em_emb x) (at level 0, x at level 99, format "{{ x }}").
+Notation "x ⊆ y" := (incl x y) (at level 70, no associativity).
+Notation "x ≤ y" := (em_le x y) (at level 70, no associativity).
+(** Membership is the underlying predicate of a convex set. The notation is
+  attached to the projection [mem] rather than to a bare application, so
+  that it only ever prints convex-set membership. *)
+Notation "x ∈ S" := (mem S x) (at level 70, no associativity).
+
+(** Membership is also inclusion of the singleton. *)
+Lemma em_in_iff `{PartialOrder} (x : P) (S : convex_set P) :
+  {{x}} ⊆ S <-> x ∈ S.
+Proof.
+  split.
+  - intros Hx. apply Hx. reflexivity.
+  - intros Hx a <-. exact Hx.
+Qed.
+
+(** Finite sets and comprehensions are joins of singletons. *)
+
+Definition em_fin `{PartialOrder} (l : list P) : convex_set P :=
+  fsup (fun a => In a l) {{-}}.
+
+Notation "{{ x , y , .. , z }}" := (em_fin (cons x (cons y .. (cons z nil) ..)))
+  (at level 0, format "{{ x , y , .. , z }}").
+
+Notation "{{ x | P }}" := (fsup (fun x => P) {{-}})
+  (at level 0, x at level 99, format "{{ x | P }}").
+
+Lemma em_comp_in `{PartialOrder} (Q : P -> Prop) (a : P) :
+  Q a -> a ∈ {{ x | Q x }}.
+Proof.
+  intros Ha. exact (fsup_ub a (fun x => Q x) {{-}} Ha a eq_refl).
+Qed.
+
+Lemma em_fin_in `{PartialOrder} (l : list P) (a : P) :
+  In a l -> a ∈ em_fin l.
+Proof.
+  intros Ha. exact (fsup_ub a (fun x => In x l) {{-}} Ha a eq_refl).
+Qed.
+
 (** On a DCPO, the embedding and the extension are moreover Scott-continuous. *)
 
 Section EM_DOMAIN_FREE.
   Context `{DCPO}.
 
-  Lemma em_emb_bot : em_emb bot = div_set.
+  Lemma em_emb_bot : {{ (bot : P) }} = div_set.
   Proof.
     apply convex_set_ext. reflexivity.
   Qed.
 
   (** It is Scott-continuous with no extra assumptions on the DCPO *)
-  Lemma em_emb_mon : Monotonic em_emb (lce ++> em_le).
+  Lemma em_emb_mon : Monotonic {{-}} (lce ++> em_le).
   Proof.
     split.
     - intros a <- a_neq_bot.
@@ -1067,7 +1032,7 @@ Section EM_DOMAIN_FREE.
   Qed.
 
   Lemma em_emb_sc {J} (x: J -> P) `{Dx: !Directed x} y : 
-    (forall j, em_le (em_emb (x j)) y) -> em_le (em_emb (dsup x)) y.
+    (forall j, em_le {{ x j }} y) -> em_le {{ dsup x }} y.
   Proof.
     intros em_le_y.
     assert (Hub: forall b, y b -> lce (dsup x) b).
@@ -1093,7 +1058,7 @@ Section EM_DOMAIN_FREE.
   Qed.
 
   Section EM_EXT_MOR.
-    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} {Hf_strict : forall y, lce (f bot) y}.
+    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f}.
 
     Lemma em_ext_mon : Monotonic (em_ext f) (em_le ++> lce).
     Proof.
@@ -1128,7 +1093,7 @@ Section EM_DOMAIN_FREE.
         transitivity (lsup (fun _ : {p : P | x p} => lsup (fun q : {q : P | y q} => f (`q)))).
         + apply lsup_mon. intros [a xa]. cbn.
           destruct (classic (a = bot)) as [-> | Ha].
-          * apply Hf_strict.
+          * apply (strict_lb f).
           * destruct (fw a xa Ha) as [b [yb _]]. exfalso. apply Hyemp. exists b. exact yb.
         + (* a constant join equals the constant when the constant least *)
           replace (lsup (fun _ : {p : P | x p} => lsup (fun q : {q : P | y q} => f (`q))))
@@ -1146,7 +1111,7 @@ Section EM_DOMAIN_FREE.
       - (* the supremum is attained at some stage *)
         destruct (dsup_em_attained x (inhabited0 := Hinh)) as [u <-]. apply Hy.
       - (* empty family: the supremum is {bot}, and f is strict *)
-        rewrite (dsup_em_empty x Hemp), <- em_emb_bot, em_ext_ana. apply Hf_strict.
+        rewrite (dsup_em_empty x Hemp), <- em_emb_bot, em_ext_ana. apply (strict_lb f).
     Qed.
 
     (** The same for any arity [K] at least as large as [P]. *)
@@ -1199,7 +1164,7 @@ Section EM_FREE.
 
   Global Program Instance em_fdcposl : IsFDCPOSL K P (convex_set P) :=
     {|
-      emb := em_emb;
+      emb := {{-}};
       ext D _ f := em_ext f;
     |}.
   Next Obligation.
@@ -1245,7 +1210,7 @@ Section EM_RELATIVE_MONAD.
 
   Lemma em_monad_runital {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
       {lceY : relation Y} {Ypo : PartialOrder lceY} (f : X -> convex_set Y) :
-    f = em_emb ;; em_ext f.
+    f = {{-}} ;; em_ext f.
   Proof.
     apply functional_extensionality. intros x. apply convex_set_ext.
     intros y. split.
@@ -1328,7 +1293,7 @@ Section EM_RELATIVE_MONAD.
     [f : X -> Y] to functions [convex_map f : convex_set X -> convex_set Y] *)
   Definition convex_map {X Y} {lceX : relation X} {Xpo : PartialOrder lceX} 
     {lceY : relation Y} {Ypo : PartialOrder lceY} 
-    (f : X -> Y) := em_ext (f ;; em_emb).
+    (f : X -> Y) := em_ext (f ;; {{-}}).
 
   Lemma convex_map_id {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
     convex_map id = id.
@@ -1342,11 +1307,11 @@ Section EM_RELATIVE_MONAD.
     convex_map (f ;; g) = convex_map f ;; convex_map g.
   Proof.
     unfold convex_map.
-    rewrite <- (em_monad_assoc (g ;; em_emb) (f ;; em_emb)
+    rewrite <- (em_monad_assoc (g ;; {{-}}) (f ;; {{-}})
                   (Hg := fun a b Hab => em_emb_mon _ _ (Hg _ _ Hab))).
     apply f_equal. 
-    change (f ;; (g ;; em_emb) = f ;; (em_emb ;; em_ext (g ;; em_emb))).
-    rewrite <- (em_monad_runital (g ;; em_emb)). reflexivity.
+    change (f ;; (g ;; {{-}}) = f ;; ({{-}} ;; em_ext (g ;; {{-}}))).
+    rewrite <- (em_monad_runital (g ;; {{-}})). reflexivity.
   Qed.
 
   (** *** Continuity of [convex_map] *)
@@ -1438,7 +1403,7 @@ Section EM_RELATIVE_MONAD.
   (** The unit and extension operators are both natural *)
   Lemma em_emb_nat {X Y}   {lceX : relation X} {Xpo : PartialOrder lceX}
       {lceY : relation Y} {Ypo : PartialOrder lceY} (f : X -> convex_set Y) :
-    em_emb ;; convex_map f = f ;; em_emb.
+    {{-}} ;; convex_map f = f ;; {{-}}.
   Proof.
     unfold convex_map. rewrite em_monad_runital. reflexivity.
   Qed.
@@ -1449,9 +1414,9 @@ Section EM_RELATIVE_MONAD.
     em_ext (g ;; f) = convex_map g ;; em_ext f.
   Proof.
     unfold convex_map.
-    rewrite <- (em_monad_assoc f (g ;; em_emb) (Hg := Hf)).
+    rewrite <- (em_monad_assoc f (g ;; {{-}}) (Hg := Hf)).
     apply f_equal.
-    change (g ;; f = g ;; (em_emb ;; em_ext f)).
+    change (g ;; f = g ;; ({{-}} ;; em_ext f)).
     rewrite <- (em_monad_runital f). reflexivity.
   Qed.
 
@@ -1461,7 +1426,7 @@ Section EM_RELATIVE_MONAD.
     em_ext (f ;; convex_map h) = em_ext f ;; convex_map h.
   Proof.
     unfold convex_map.
-    exact (em_monad_assoc (h ;; em_emb) f (Hg := fun a b Hab => em_emb_mon _ _ (Hh _ _ Hab))).
+    exact (em_monad_assoc (h ;; {{-}}) f (Hg := fun a b Hab => em_emb_mon _ _ (Hh _ _ Hab))).
   Qed.
 
   Section EM_KLEISLI.
@@ -1470,14 +1435,14 @@ Section EM_RELATIVE_MONAD.
       f ;; em_ext g.
     
     Lemma kl_em_compose_id_left {X Y} {Ydcpo : DCPO Y} (f : X -> convex_set Y) :
-      em_kl_compose em_emb f = f.
+      em_kl_compose {{-}} f = f.
     Proof.
       unfold em_kl_compose. rewrite em_monad_lunital. reflexivity.
     Qed.
 
     Lemma kl_em_compose_id_right {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
       {Ydcpo : DCPO Y} (g : X -> convex_set Y) :
-      em_kl_compose g em_emb = g.
+      em_kl_compose g {{-}} = g.
     Proof.
       unfold em_kl_compose. rewrite <- em_monad_runital. reflexivity.
     Qed.

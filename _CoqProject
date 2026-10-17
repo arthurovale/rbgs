@@ -46,5 +46,5 @@ structures/KDCPOs.v
 structures/DCPOSLs.v
 
 # Communicating Objects
-comobj/AsyncEvents.v
+comobj/SilentEvents.v
 comobj/Sig.v

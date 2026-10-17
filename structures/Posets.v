@@ -145,3 +145,25 @@ Delimit Scope poselt_scope with poselt.
 Bind Scope poselt_scope with Poset.carrier.
 
 Infix "<=" := ref.
+
+(** * Pointed partial orders *)
+
+(** A partial order with a least element. The [bot] of a DCPO and the
+  [lbot] of a semilattice are instances, indexed by their respective
+  orders. *)
+
+Class Pointed {P} (R : relation P) `{!PartialOrder R} :=
+  {
+    bot : P;
+    bot_lb : forall x, R bot x;
+  }.
+
+(** [bot] is a projection; keep [simpl] and [cbn] from unfolding it to the
+  underlying supremum, so that lemmas stated with [bot] keep matching. *)
+Arguments bot : simpl never.
+
+Lemma bot_eq `{Pointed} (x : P) :
+  R x bot -> x = bot.
+Proof.
+  intros Hx. apply antisymmetry; [exact Hx | apply bot_lb].
+Qed.
