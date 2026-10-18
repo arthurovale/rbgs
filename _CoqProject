@@ -48,3 +48,7 @@ structures/DCPOSLs.v
 # Communicating Objects
 comobj/SilentEvents.v
 comobj/Sig.v
+comobj/LCoalg.v
+comobj/ComObj.v
+
+structures/TypeclassProbes.v

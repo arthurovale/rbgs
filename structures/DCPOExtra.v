@@ -13,6 +13,8 @@ Require Import structures.KDCPOs.
 Class DirectedComplete `{PartialOrder} :=
   dcomplete : forall {I} (x : I -> P), inhabited I -> Directed x -> exists u, IsSup x u.
 
+Global Hint Mode DirectedComplete ! - - : typeclass_instances.
+
 Global Instance eq_po (X : Type) : PartialOrder (@eq X) | 10.
 Proof.
   split. typeclasses eauto. intros x y -> _. reflexivity.
@@ -30,20 +32,10 @@ Proof.
   intros I x _ Hx. exists (dsup x). apply dsup_is_sup.
 Qed.
 
-(** * Strict maps *)
+(** * Strict maps between DCPOs *)
 
-(** A map between DCPOs is strict when it preserves the least element. *)
-
-Class Strict {A B} `{Adcpo : DCPO A} `{Bdcpo : DCPO B} (f : A -> B) :=
-  strict_bot : f bot = bot.
-
-Lemma strict_lb {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!Strict f} (y : B) :
-  lce (f bot) y.
-Proof.
-  rewrite (strict_bot (f := f)). apply bot_lb.
-Qed.
-
-(** Strict Scott-continuity implies strictness. *)
+(** [Strict] is defined over pointed orders in [Posets]; here are the two
+  derivations for DCPOs. Strict Scott-continuity implies strictness. *)
 Global Instance sc_strict {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!ScottContinuous true f} :
   Strict f := sc_bot.
 
@@ -68,9 +60,9 @@ Section PROD.
   Proof.
     intros I x HI Hx.
     assert (D1 : Directed (fun i => fst (x i))).
-    { intros i j. destruct (directed i j) as [k [[H1 _] [H2 _]]]. exists k. auto. }
+    { intros i j. destruct (Hx i j) as [k [[H1 _] [H2 _]]]. exists k. auto. }
     assert (D2 : Directed (fun i => snd (x i))).
-    { intros i j. destruct (directed i j) as [k [[_ H1] [_ H2]]]. exists k. auto. }
+    { intros i j. destruct (Hx i j) as [k [[_ H1] [_ H2]]]. exists k. auto. }
     destruct (dcomplete _ HI D1) as [u1 Hu1].
     destruct (dcomplete _ HI D2) as [u2 Hu2].
     exists (u1, u2). split.
@@ -97,7 +89,7 @@ Arguments lift_el {P} x.
 Definition lift (P : Type) (R : relation P) : Type := lift_raw P.
 
 Section LIFT.
-  Context `{PartialOrder} `{!DirectedComplete}.
+  Context `{PartialOrder} `{!DirectedComplete (R := R)}.
 
   Inductive lift_lce : lift P R -> lift P R -> Prop :=
   | lift_lce_bot t : lift_lce lift_bot t
@@ -161,7 +153,7 @@ Section LIFT.
   Definition lift_dsup {I} (x : I -> lift P R) `{!Directed x} : lift P R :=
     epsilon (inhabits lift_bot) (fun u => IsSup x u).
 
-  Global Program Instance lift_dcpo : DCPO (lift P R) :=
+  Local Program Instance lift_dcpo : DCPO (lift P R) :=
     {|
       lce := lift_lce;
       dsup := @lift_dsup;
@@ -195,66 +187,82 @@ Section LIFT.
   Qed.
 End LIFT.
 
-(** The lift instances are only tried on goals syntactically about a [lift],
-  for the same reason as the Egli-Milner instances in [DCPOSLs]. *)
-#[global] Remove Hints lift_po lift_dcpo : typeclass_instances.
-Global Hint Extern 1 (PartialOrder (@lift_lce _ _)) => simple eapply @lift_po : typeclass_instances.
 Global Hint Extern 1 (DCPO (lift _ _)) => simple eapply @lift_dcpo : typeclass_instances.
 
 (** * Kleisli extension *)
 
 Section LIFT_EXT.
-  Context `{PartialOrder} `{!DirectedComplete} {D} `{Ddcpo : DCPO D}.
+  Context `{PartialOrder} `{!DirectedComplete (R := R)}.
 
-  Definition lift_ext (f : P -> D) (t : lift P R) : D :=
-    match t with
-    | lift_bot => bot
-    | lift_el x => f x
-    end.
+  (** The extension only needs a least element in its codomain. *)
 
-  Lemma lift_ext_el (f : P -> D) (x : P) :
-    lift_ext f (lift_el x) = f x.
-  Proof.
-    reflexivity.
-  Qed.
+  Section POINTED_CODOMAIN.
+    Context {D} {RD : relation D} `{!PartialOrder RD} `{!Pointed RD}.
 
-  Global Instance lift_ext_strict (f : P -> D) : Strict (lift_ext f).
-  Proof.
-    unfold Strict. rewrite lift_bot_eq. reflexivity.
-  Qed.
+    Definition lift_ext (f : P -> D) (t : lift P R) : D :=
+      match t with
+      | lift_bot => bot
+      | lift_el x => f x
+      end.
 
-  (** [lift_ext] is monotone in the extended map, pointwise. *)
-  Lemma lift_ext_mon_r (g g' : P -> D) :
-    (forall p, lce (g p) (g' p)) ->
-    forall t, lce (lift_ext g t) (lift_ext g' t).
-  Proof.
-    intros Hg [| p]; [reflexivity | apply Hg].
-  Qed.
+    Lemma lift_ext_el (f : P -> D) (x : P) :
+      lift_ext f (lift_el x) = f x.
+    Proof.
+      reflexivity.
+    Qed.
 
-  (** [lift_ext f] is strict Scott-continuous as soon as [f] is monotonic and
-    preserves the suprema of inhabited directed families. *)
+    Global Instance lift_ext_strict (f : P -> D) : Strict (RB := RD) (lift_ext f).
+    Proof.
+      unfold Strict. rewrite lift_bot_eq. reflexivity.
+    Qed.
 
-  Lemma lift_ext_sc (f : P -> D)
-      (Hmon : Monotonic f (R ++> lce))
-      (Hsup : forall {I} (x : I -> P) (u : P), inhabited I -> Directed x -> IsSup x u ->
-                forall y, (forall i, lce (f (x i)) y) -> lce (f u) y) :
-    ScottContinuous true (lift_ext f).
-  Proof.
-    split.
-    - intros t u Htu. change (lift_lce t u) in Htu.
-      inversion Htu; subst; cbn; [apply bot_lb | apply Hmon; assumption].
-    - intros J HJ x Dx y Hy.
-      destruct (lift_dsup_cases x) as [-> | [u [Hu [-> [i0 [a0 Hi0]]]]]].
-      + cbn. apply bot_lb.
-      + cbn. apply (Hsup _ (lift_els x) u (inhabits (exist _ a0 (ex_intro _ i0 Hi0))) _ Hu).
-        intros [p [i Hi]]. cbn. specialize (Hy i). rewrite Hi in Hy. exact Hy.
-  Qed.
+    (** [lift_ext] is monotone in the extended map, pointwise. *)
+    Lemma lift_ext_mon_r (g g' : P -> D) :
+      (forall p, RD (g p) (g' p)) ->
+      forall t, RD (lift_ext g t) (lift_ext g' t).
+    Proof.
+      intros Hg [| p]; [reflexivity | apply Hg].
+    Qed.
+  End POINTED_CODOMAIN.
+
+  (** Continuity needs a DCPO in the codomain. [lift_ext f] is strict
+    Scott-continuous as soon as [f] is monotonic and preserves the suprema
+    of inhabited directed families. *)
+
+  Section DCPO_CODOMAIN.
+    Context {D} `{Ddcpo : DCPO D}.
+
+    Lemma lift_ext_sc (f : P -> D)
+        (Hmon : Monotonic f (R ++> lce))
+        (Hsup : forall {I} (x : I -> P) (u : P), inhabited I -> Directed x -> IsSup x u ->
+                  forall y, (forall i, lce (f (x i)) y) -> lce (f u) y) :
+      ScottContinuous true (lift_ext (RD := lce) f).
+    Proof.
+      split.
+      - intros t u Htu. change (lift_lce t u) in Htu.
+        inversion Htu; subst; cbn; [apply bot_lb | apply Hmon; assumption].
+      - intros J HJ x Dx y Hy.
+        destruct (lift_dsup_cases x) as [-> | [u [Hu [-> [i0 [a0 Hi0]]]]]].
+        + cbn. apply bot_lb.
+        + cbn. apply (Hsup _ (lift_els x) u (inhabits (exist _ a0 (ex_intro _ i0 Hi0))) _ Hu).
+          intros [p [i Hi]]. cbn. specialize (Hy i). rewrite Hi in Hy. exact Hy.
+    Qed.
+  End DCPO_CODOMAIN.
 End LIFT_EXT.
 
 (** ** The flat domain: every function out of a set extends. *)
 
+(** Out of a flat domain, every extension is monotone into any pointed
+  order, since the only strict inequalities start at the bottom. *)
+Lemma lift_ext_flat_mon {X D} {RD : relation D} `{!PartialOrder RD} `{!Pointed RD} (f : X -> D) :
+  Monotonic (lift_ext (R := eq) (RD := RD) f) (lce ++> RD).
+Proof.
+  intros t u Htu. change (lift_lce t u) in Htu.
+  inversion Htu; subst; cbn; [apply bot_lb | reflexivity].
+Qed.
+
 Global Instance lift_ext_flat_sc {X D} `{DCPO D} (f : X -> D) :
-  ScottContinuous true (lift_ext (R := eq) f).
+  ScottContinuous true (lift_ext (R := eq) (RD := lce) f).
 Proof.
   apply lift_ext_sc.
   - intros a b ->. reflexivity.
@@ -265,7 +273,7 @@ Qed.
 (** ** The lift monad: non-strict continuous maps extend to strict ones. *)
 
 Global Instance lift_ext_dcpo_sc {P D} `{DCPO P} `{DCPO D} (f : P -> D) `{!ScottContinuous false f} :
-  ScottContinuous true (lift_ext (R := lce) f).
+  ScottContinuous true (lift_ext (R := lce) (RD := lce) f).
 Proof.
   apply lift_ext_sc.
   - apply sc_lce.
@@ -287,7 +295,7 @@ Class Finitary `{PartialOrder} :=
 
 (** Instance search for [Finitary] must know the relation: otherwise
   [lift_finitary] below applies to itself indefinitely. *)
-Global Hint Mode Finitary - ! - : typeclass_instances.
+Global Hint Mode Finitary ! ! - : typeclass_instances.
 
 (** From a point-of-view of partial orders as causal structures, this condition 
 may be read as stating that every piece of information is can be justified 
@@ -350,9 +358,9 @@ Proof.
   destruct (classic (inhabited J)) as [Hinh | Hemp].
   - destruct (finitary_DCPO_acc x (inhabited0 := Hinh)) as [i Hi].
     replace (dsup x) with (x i); [apply Hy |].
-    apply (antisymmetry (R := lce)); [apply dsup_ub | apply dsup_lub; exact Hi].
+    apply antisymmetry; [apply dsup_ub | apply dsup_lub; exact Hi].
   - replace (dsup x) with (bot : A); [rewrite (strict_bot (f := f)); apply bot_lb |].
-    apply (antisymmetry (R := lce)); [apply bot_lb |].
+    apply antisymmetry; [apply bot_lb |].
     apply dsup_lub. intros j. exfalso. apply Hemp. exact (inhabits j).
 Qed.
 

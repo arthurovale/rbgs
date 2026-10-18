@@ -10,12 +10,26 @@ Require Import Stdlib.Logic.FunctionalExtensionality.
 
 Require Import comobj.SilentEvents.
 Import SilentEvents.
+Require Import comobj.LCoalg.
 
+(** * Communicating Objects *)
+
+(** ** Transition Shape *)
+
+(** A communicating object has several types of transitions:
+- [↺] a divergent transition
+- [-ɛ-> s] a silent transition to a new state [s]
+- [-'e-> s] a visible transition with label [e] to a new state [s]
+Note that since [S] has its own bottom element, there are also the following
+special transitions:
+- [-ɛ-> ↺_S] a silent transition to the later diverging state [↺_S]
+- [-'e-> ↺_S] a visible transition to the later diverging state [↺_S]
+these are special in that the only possible transition out of [↺_S] will 
+be the divergent transition [↺] 
+*)
 Definition Tsil (E S : Type) {Sdcpo : DCPO S} : Type :=
   lift (Sil E * S) (eq * lce)%rel.
 
-(** Instance search must not unfold [Tsil]: it is literally [Tvis (Sil E) S],
-  and the two must not compete for the same instances. *)
 #[global] Typeclasses Opaque Tsil.
 
 Declare Scope tsil_scope.
@@ -25,6 +39,7 @@ Notation "↑ s" := (lift_el s) (at level 9, s at next level) : tsil_scope.
 Notation "↺" := lift_bot : tsil_scope.
 Notation "- a -> t" := (lift_el (a, t))
   (at level 35, a at level 35, t at level 35) : tsil_scope.
+Notation "↺_S" := (bot : S).
 
 Open Scope tsil_scope.
 
@@ -33,7 +48,7 @@ Local Abbreviation id := (fun x => x).
 
 Section TSIL.
   Context {E S : Type} {Sdcpo : DCPO S}.
-  Global Instance Tsil_dcpo : DCPO (Tsil E S) := lift_dcpo.
+  Local Instance Tsil_dcpo : DCPO (Tsil E S) := lift_dcpo.
 
   Lemma Tsil_bot : (bot : Tsil E S) = ↺.
   Proof. apply lift_bot_eq. Qed.
@@ -56,14 +71,14 @@ Section TSIL.
   Qed.
 End TSIL.
 
-Record comobj E S {Sdcpo : DCPO S} :=
-  {
-    trans :> S -> convex_set (Tsil E S);
-    init : S -> Prop;
-    trans_mon :: Monotonic trans (lce ++> lce);
-    trans_strict :: Strict trans;
-  }.
+Global Hint Extern 1 (DCPO (Tsil _ _)) => simple eapply @Tsil_dcpo : typeclass_instances.
 
-Definition sil_loop {E} : comobj E (lift unit eq) :=
-  lift_ext (D := convex_set (Tsil E (lift unit eq))) (fun s => {{-ɛ-> ↑s}}).
+(** ** Communicating Objects *)
+Abbreviation comobj := (lcoalg Tsil).
 
+(** ** Simple Communicating Objects *)
+
+(** The communicating object [sil_loop] consists of a single non-diverging
+state [tt] and a silent-loop on it. *)
+Definition sil_loop E : comobj E (lift unit eq) :=
+  flat_lcoalg Tsil (fun s => {{-ɛ-> ↑s}}) (fun _ => True).

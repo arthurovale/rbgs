@@ -21,6 +21,8 @@ Class PartialOrder {P} (R : relation P) :=
     po_antisym :: Antisymmetric P eq R;
   }.
 
+Global Hint Mode PartialOrder ! - : typeclass_instances.
+
 (** *** Suprema *)
 
 Class IsSup `{PartialOrder} {I} (x : I -> P) (u : P) :=
@@ -158,6 +160,8 @@ Class Pointed {P} (R : relation P) `{!PartialOrder R} :=
     bot_lb : forall x, R bot x;
   }.
 
+Global Hint Mode Pointed ! - - : typeclass_instances.
+
 (** [bot] is a projection; keep [simpl] and [cbn] from unfolding it to the
   underlying supremum, so that lemmas stated with [bot] keep matching. *)
 Arguments bot : simpl never.
@@ -166,4 +170,23 @@ Lemma bot_eq `{Pointed} (x : P) :
   R x bot -> x = bot.
 Proof.
   intros Hx. apply antisymmetry; [exact Hx | apply bot_lb].
+Qed.
+
+(** * Strict maps *)
+
+(** A map between pointed orders is strict when it preserves the least
+  element. The orders are implicit; name them with [(RA := ...)] or
+  [(RB := ...)] when a carrier has more than one pointed order. *)
+
+Class Strict {A B} {RA : relation A} {RB : relation B}
+    `{POA : !PartialOrder RA} `{POB : !PartialOrder RB}
+    `{PA : !Pointed RA} `{PB : !Pointed RB} (f : A -> B) :=
+  strict_bot : f bot = bot.
+
+Lemma strict_lb {A B} {RA : relation A} {RB : relation B}
+    `{!PartialOrder RA} `{!PartialOrder RB} `{!Pointed RA} `{!Pointed RB}
+    (f : A -> B) `{!Strict (RA := RA) (RB := RB) f} (y : B) :
+  RB (f bot) y.
+Proof.
+  rewrite (strict_bot (f := f)). apply bot_lb.
 Qed.

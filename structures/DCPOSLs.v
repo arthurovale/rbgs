@@ -45,9 +45,13 @@ Class DCPOSL (L : Type) :=
     sup_kcont {K} :: KContinuous K (lsup (L := L) (I := K));
   }.
 
+#[global] Remove Hints dcposl_dcpo dcposl_sl : typeclass_instances.
+Global Existing Instance dcposl_dcpo | 10.
+Global Existing Instance dcposl_sl | 10.
+
 (** The join order of a semilattice is pointed by [lbot]. It gets a low
   priority so that an unannotated [bot] on a DCPOSL means the [lce] bottom. *)
-Global Instance sl_pointed `{SemiLattice} : Pointed ref | 10 :=
+Global Instance sl_pointed `{SemiLattice} : Pointed ref | 20 :=
   {| bot := lbot; bot_lb := lbot_lb |}.
 
 (** The [kc_lce] component of [sup_kcont] in pointwise form *)
@@ -110,7 +114,7 @@ Section FORALL_DCPOSL.
 
   Local Obligation Tactic := idtac.
 
-  Global Program Instance forall_sl : SemiLattice (forall i, L i) :=
+  Local Program Instance forall_sl : SemiLattice (forall i, L i) :=
     {
       cdl_poset := forall_poset;
       lsup J x := fun i => lsup (fun j => x j i);
@@ -135,7 +139,7 @@ Section FORALL_DCPOSL.
     intros sel. destruct (Kx sel) as [u Hu]. exists u. intros k. apply (Hu k).
   Qed.
 
-  Global Program Instance forall_dcposl : DCPOSL (forall i, L i) :=
+  Local Program Instance forall_dcposl : DCPOSL (forall i, L i) :=
     {
       dcposl_dcpo := _;
       dcposl_sl := forall_sl;
@@ -158,10 +162,6 @@ Section FORALL_DCPOSL.
   Qed.
 End FORALL_DCPOSL.
 
-(** As for [forall_dcpo], the goal must syntactically be a product. The
-  instances registered automatically by [Global Instance] are removed, since
-  they would unify an unknown carrier with a product. *)
-#[global] Remove Hints forall_sl forall_dcposl : typeclass_instances.
 Global Hint Extern 1 (SemiLattice (forall i, _)) =>
   lazymatch goal with |- SemiLattice (forall _, _) => eapply @forall_sl end : typeclass_instances.
 Global Hint Extern 1 (DCPOSL (forall i, _)) =>
@@ -264,7 +264,7 @@ Section CONVEX_SETS.
     firstorder.
   Qed.
 
-  Global Instance convex_poset : Poset (convex_set P) :=
+  Local Instance convex_poset : Poset (convex_set P) :=
   {
     ref := incl;
   }.
@@ -342,7 +342,7 @@ Section CONVEX_SETS.
 
   (** Note that no assumption on the DCPO is required for the semilattice structure *)
 
-  Global Program Instance convex_sl : SemiLattice (convex_set P) :=
+  Local Program Instance convex_sl : SemiLattice (convex_set P) :=
     {
       lsup I x := convex_sup x;
     }.
@@ -358,19 +358,24 @@ Section CONVEX_SETS.
 
 End CONVEX_SETS.
 
+Global Hint Extern 1 (Poset (convex_set _)) => simple eapply @convex_poset : typeclass_instances.
+Global Hint Extern 1 (SemiLattice (convex_set _)) => simple eapply @convex_sl : typeclass_instances.
 
-Section EGLI_MILNER_DOMAIN.
-  Context `{DCPO}.
 
-  (** *** Candidate DCPO Structure *)
+(** *** The Egli-Milner order *)
+
+(** The order only needs a least element in [P]. *)
+
+Section EM_ORDER.
+  Context `{PartialOrder} `{!Pointed R}.
 
   Record em_le (x y : convex_set P) :=
     {
       (** fw: no information is dropped, if a in x then it evolves to some b in y *)
       (** different from standard EM, we consider bot and do not enforce fw for it *)
-      em_le_fw : forall (a : P), x a -> a <> bot -> exists (b : P) , y b /\ lce a b;
+      em_le_fw : forall (a : P), x a -> a <> bot -> exists (b : P) , y b /\ R a b;
       (** anything in y needs to be justified by something in x *)
-      em_le_bw : forall (b : P) , y b -> exists (a : P) , x a /\ lce a b
+      em_le_bw : forall (b : P) , y b -> exists (a : P) , x a /\ R a b
     }.
 
   (** bot can only be removed forwardly *)
@@ -379,7 +384,7 @@ Section EGLI_MILNER_DOMAIN.
   Proof.
     intros Hle Hybot. destruct Hle as [Hfw Hbw].
     specialize (Hbw bot Hybot). destruct Hbw as [a [in_x lcea]].
-    pose lce_bot_eq as Heq. specialize (Heq a lcea). rewrite <- Heq. exact in_x.
+    rewrite <- (lce_bot_eq a lcea). exact in_x.
   Qed.
 
   (** the bottom element for em_le is {div} *)
@@ -448,6 +453,12 @@ Section EGLI_MILNER_DOMAIN.
   (** The EM order is pointed by [div_set], with no further assumption on [P]. *)
   Global Instance em_pointed : Pointed em_le :=
     {| bot := div_set; bot_lb := div_set_bot |}.
+End EM_ORDER.
+
+Section EGLI_MILNER_DOMAIN.
+  Context `{DCPO}.
+
+  (** *** Candidate DCPO Structure *)
 
   (** the supremum is the set of all elements that are eventually always present *)
   (** bot is only present if it never gets removed *)
@@ -625,7 +636,7 @@ Section EGLI_MILNER_DOMAIN.
       assert (Hdsup : dsup_em x = x u).
       { apply convex_set_ext. intros p. cbn. symmetry. exact (Hk p u (Hu p)). }
       rewrite Hdsup. split.
-      + intros i. destruct (directed i u) as [v [Hiv Huv]].
+      + intros i. destruct (Hx i u) as [v [Hiv Huv]].
         rewrite <- (Hstable v Huv). exact Hiv.
       + intros y Hy. apply Hy.
     - rewrite (dsup_em_empty x Hemp). split.
@@ -638,7 +649,7 @@ Section EGLI_MILNER_DOMAIN.
   (* So instead, we show that under the condtion that the DCPO is finitary 
     it is so. *)
   
-  Global Program Instance em_dcpo `{!Finitary (R := lce)} : DCPO (convex_set P) := 
+  Local Program Instance em_dcpo `{!Finitary (R := lce)} : DCPO (convex_set P) := 
   {|
     lce := em_le;
     dsup := @dsup_em;
@@ -725,7 +736,7 @@ Section EGLI_MILNER_DOMAIN.
         contradiction.
   Qed.
 
-  Global Program Instance em_dcposl `{!Finitary (R := lce)} : DCPOSL (convex_set P) :=
+  Local Program Instance em_dcposl `{!Finitary (R := lce)} : DCPOSL (convex_set P) :=
   {|
     dcposl_dcpo := em_dcpo;
     dcposl_sl := convex_sl;
@@ -862,11 +873,6 @@ Section EGLI_MILNER_DOMAIN.
   Qed.
 End EGLI_MILNER_DOMAIN.
 
-(** The Egli-Milner instances are only tried on goals that are syntactically
-  about a [convex_set]. As plain instances they would also apply to a goal
-  with an unknown carrier, producing ever larger domains [convex_set ?Q] and
-  sending instance search into a loop. *)
-#[global] Remove Hints em_dcpo em_dcposl : typeclass_instances.
 Global Hint Extern 1 (DCPO (convex_set _)) => simple eapply @em_dcpo : typeclass_instances.
 Global Hint Extern 1 (DCPOSL (convex_set _)) => simple eapply @em_dcposl : typeclass_instances.
 
@@ -1014,22 +1020,34 @@ Qed.
 
 (** On a DCPO, the embedding and the extension are moreover Scott-continuous. *)
 
-Section EM_DOMAIN_FREE.
-  Context `{DCPO}.
+(** With a least element, the embedding is strict and monotone. *)
+
+Section EM_EMB_POINTED.
+  Context `{PartialOrder} `{!Pointed R}.
 
   Lemma em_emb_bot : {{ (bot : P) }} = div_set.
   Proof.
     apply convex_set_ext. reflexivity.
   Qed.
 
+  Lemma em_ext_bot {D} `{SemiLattice D} (f : P -> D) : em_ext f bot = f bot.
+  Proof.
+    change (@bot (convex_set P) _ _ _) with (div_set (R := R)). rewrite <- em_emb_bot. apply em_ext_ana.
+  Qed.
+
   (** It is Scott-continuous with no extra assumptions on the DCPO *)
-  Lemma em_emb_mon : Monotonic {{-}} (lce ++> em_le).
+  Lemma em_emb_mon : Monotonic {{-}} (R ++> em_le).
   Proof.
     split.
     - intros a <- a_neq_bot.
       exists y. split; [reflexivity | assumption].
     - intros b <-. exists x; split; [reflexivity | assumption].
   Qed.
+End EM_EMB_POINTED.
+
+Section EM_DOMAIN_FREE.
+  Context `{DCPO}.
+
 
   Lemma em_emb_sc {J} (x: J -> P) `{Dx: !Directed x} y : 
     (forall j, em_le {{ x j }} y) -> em_le {{ dsup x }} y.
@@ -1234,7 +1252,7 @@ Section EM_RELATIVE_MONAD.
   Qed.
 
   Lemma em_monad_assoc {X Y Z} {lceX : relation X} {Xpo : PartialOrder lceX}
-      {lceY : relation Y} {Ypo : PartialOrder lceY} {Zdcpo : DCPO Z}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}
       (g : Y -> convex_set Z) (f :  X -> convex_set Y)
       {Hg : Monotonic g (lceY ++> em_le)} :
       em_ext (f ;; em_ext g) = em_ext f ;; em_ext g.
@@ -1262,11 +1280,11 @@ Section EM_RELATIVE_MONAD.
       + transitivity c; assumption.
     - intros [za [zc [za_in [zc_in [lce_za_zb lce_zb_zc]]]]].
       assert (Hbr : forall p, em_ext f x p -> forall z, g p z ->
-        (exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lce a z) /\
-        (exists c, union (fun q : {q : X | x q} => em_ext g (f (`q))) c /\ lce z c)).
+        (exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lceZ a z) /\
+        (exists c, union (fun q : {q : X | x q} => em_ext g (f (`q))) c /\ lceZ z c)).
       {
         intros p [ay [cy [[qa Hay] [[qc Hcy] [lce_ay_p lce_p_cy]]]]] z Hz.
-        assert (Hlo : exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lce a z).
+        assert (Hlo : exists a, union (fun q : {q : X | x q} => em_ext g (f (`q))) a /\ lceZ a z).
         {
           destruct (Hg ay p lce_ay_p) as [_ bw].
           destruct (bw z Hz) as [a [Ha lce_a_z]].
@@ -1296,14 +1314,14 @@ Section EM_RELATIVE_MONAD.
     (f : X -> Y) := em_ext (f ;; {{-}}).
 
   Lemma convex_map_id {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
-    convex_map id = id.
+    convex_map (id : X -> X) = id.
   Proof.
     unfold convex_map. rewrite em_monad_lunital. reflexivity.
   Qed.
 
   Lemma convex_map_compose {X Y Z}  {lceX : relation X} {Xpo : PartialOrder lceX}
-    {lceY : relation Y} {Ypo : PartialOrder lceY}  {Zdcpo : DCPO Z}
-    (g : Y -> Z) (f : X -> Y) {Hg : Monotonic g (lceY ++> lce)} :
+    {lceY : relation Y} {Ypo : PartialOrder lceY}  {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}
+    (g : Y -> Z) (f : X -> Y) {Hg : Monotonic g (lceY ++> lceZ)} :
     convex_map (f ;; g) = convex_map f ;; convex_map g.
   Proof.
     unfold convex_map.
@@ -1322,9 +1340,10 @@ Section EM_RELATIVE_MONAD.
     attains its supremum, while the empty family is handled by strictness of
     [f]. *)
 
-  Section CONVEX_MAP_KCONT.
-    Context {K X Y} `{Xws : WSDCPO K X} `{Ydcpo : DCPO Y}.
-    Context (f : X -> Y) `{Hf : !ScottContinuous true f}.
+  Section CONVEX_MAP_MON.
+    Context {X Y} {lceX : relation X} {Xpo : PartialOrder lceX} {Xpt : Pointed lceX}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} {Ypt : Pointed lceY}
+      (f : X -> Y) `{Hf : !Monotonic f (lceX ++> lceY)} `{Hf_strict : !Strict f}.
 
     Lemma convex_map_mon : Monotonic (convex_map f) (em_le ++> em_le).
     Proof.
@@ -1336,11 +1355,11 @@ Section EM_RELATIVE_MONAD.
         cbn in Hlo, Hhi. subst lo hi.
         assert (Hq_nbot : q <> bot).
         { intros ->. apply Ha_nbot, lce_bot_eq.
-          transitivity (f bot); [exact lce_a_hi | apply sc_bot_lb]. }
+          transitivity (f bot); [exact lce_a_hi | apply (strict_lb f)]. }
         destruct (fw q Hq Hq_nbot) as [q' [Hq' lce_q_q']].
         exists (f q'). split.
         + apply chull_extensive. exists (exist _ q' Hq'). reflexivity.
-        + transitivity (f q); [exact lce_a_hi | apply sc_lce; exact lce_q_q'].
+        + transitivity (f q); [exact lce_a_hi | apply Hf; exact lce_q_q'].
       - (* bw: [b] is above some [f p'] with [p'] in [x'], justified by [p] in [x] *)
         intros b Hb.
         destruct Hb as [lo [hi [[[p' Hp'] Hlo] [_ [lce_lo_b _]]]]].
@@ -1348,8 +1367,13 @@ Section EM_RELATIVE_MONAD.
         destruct (bw p' Hp') as [p [Hp lce_p_p']].
         exists (f p). split.
         + apply chull_extensive. exists (exist _ p Hp). reflexivity.
-        + transitivity (f p'); [apply sc_lce; exact lce_p_p' | exact lce_lo_b].
+        + transitivity (f p'); [apply Hf; exact lce_p_p' | exact lce_lo_b].
     Qed.
+  End CONVEX_MAP_MON.
+
+  Section CONVEX_MAP_KCONT.
+    Context {K X Y} `{Xws : WSDCPO K X} `{Ydcpo : DCPO Y}.
+    Context (f : X -> Y) `{Hf : !ScottContinuous true f}.
 
     Lemma convex_map_dsup_em {I} (x : I -> convex_set X) `{Dx : !Directed (R := em_le) x}
         `{Kx : !KDirected (R := em_le) K x} y :
@@ -1394,7 +1418,7 @@ Section EM_RELATIVE_MONAD.
       Lemma convex_map_kcont : KContinuous K (convex_map f).
       Proof.
         split.
-        - exact convex_map_mon.
+        - exact (convex_map_mon f (Hf := sc_lce) (Hf_strict := sc_strict f)).
         - intros I x Dx Kx y Hy. apply (convex_map_dsup_em x). exact Hy.
       Qed.
     End CONVEX_MAP_KCONT_INSTANCE.
@@ -1409,7 +1433,7 @@ Section EM_RELATIVE_MONAD.
   Qed.
 
   Lemma em_ext_nat_src {X Y Z} {lceX : relation X} {Xpo : PartialOrder lceX}
-      {lceY : relation Y} {Ypo : PartialOrder lceY} {Zdcpo : DCPO Z}
+      {lceY : relation Y} {Ypo : PartialOrder lceY} {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}
       (f : X -> convex_set Z) {Hf : Monotonic f (lceX ++> em_le)} (g : Y -> X) :
     em_ext (g ;; f) = convex_map g ;; em_ext f.
   Proof.
@@ -1431,7 +1455,7 @@ Section EM_RELATIVE_MONAD.
 
   Section EM_KLEISLI.
     Definition em_kl_compose {X Y Z} {lceY: relation Y} {Ypo : PartialOrder lceY}
-      {Zdcpo : DCPO Z}  (g : Y -> convex_set Z) (f : X -> convex_set Y) := 
+      {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}  (g : Y -> convex_set Z) (f : X -> convex_set Y) := 
       f ;; em_ext g.
     
     Lemma kl_em_compose_id_left {X Y} {Ydcpo : DCPO Y} (f : X -> convex_set Y) :
@@ -1448,9 +1472,9 @@ Section EM_RELATIVE_MONAD.
     Qed.
 
     Lemma kl_em_compose_assoc {X Y Z W} {lceY : relation Y} {Ypo : PartialOrder lceY}
-        {Zdcpo : DCPO Z} {Wdcpo : DCPO W}
+        {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ} {lceW : relation W} {Wpo : PartialOrder lceW} {Wpt : Pointed lceW}
         (h : Z -> convex_set W) (g : Y -> convex_set Z) (f : X -> convex_set Y)
-        {Hh : Monotonic h (lce ++> em_le)} :
+        {Hh : Monotonic h (lceZ ++> em_le)} :
       em_kl_compose h (em_kl_compose g f) = em_kl_compose (em_kl_compose h g) f.
     Proof.
       unfold em_kl_compose. rewrite em_monad_assoc. reflexivity. assumption.

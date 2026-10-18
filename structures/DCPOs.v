@@ -115,25 +115,26 @@ Qed.
 (** *** Least element *)
 
 (** The supremum of the empty family is the least element. *)
-Global Program Instance dcpo_pointed `{DCPO} : Pointed lce :=
+Global Program Instance dcpo_pointed `{DCPO} : Pointed lce | 10 :=
   {| bot := dsup (Empty_set_rect _) |}.
 Next Obligation.
   intros. apply sup_lub. tauto.
 Qed.
 
-Lemma lce_bot_eq `{DCPO} x :
-  lce x bot -> x = bot.
+(** These only use the least element and hold for any pointed order. *)
+
+Lemma lce_bot_eq `{Pointed} (x : P) :
+  R x bot -> x = bot.
 Proof.
-  intros Hlce. apply antisymmetry.
-  assumption. apply bot_lb.
+  apply bot_eq.
 Qed.
 
-Lemma lce_bot_neq `{DCPO} x y :
-  lce x y -> x <> bot -> y <> bot.
+Lemma lce_bot_neq `{Pointed} (x y : P) :
+  R x y -> x <> bot -> y <> bot.
 Proof.
-  intros lce_x_y neq_bot y_eq.
+  intros Hxy neq_bot y_eq.
   apply neq_bot. apply lce_bot_eq. rewrite <- y_eq. assumption.
-Qed. 
+Qed.
 
 (** *** Binary case for [dsup] *)
 
@@ -523,7 +524,7 @@ Module FDC.
 
   Arguments carrier : clear implicits.
 
-  Global Program Instance structure A : DCPO (carrier A) :=
+  Local Program Instance structure A : DCPO (carrier A) :=
     {
       lce x y := forall a, is x a -> is y a;
       dsup I x Dx := {| is a := exists i, is (x i) a |};
@@ -592,6 +593,7 @@ Module FDC.
       assumption.
   Qed.
 
+  Global Hint Extern 1 (DCPO (carrier _)) => simple eapply @structure : typeclass_instances.
 End FDC.
 
 Abbreviation fdc := FDC.carrier.
