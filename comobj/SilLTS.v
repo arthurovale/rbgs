@@ -1,6 +1,9 @@
+Require Import interfaces.Functor.
+
 Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
+Require Import structures.KDCPOs.
 Require Import structures.DCPOSLs.
 
 Require Import Stdlib.Lists.List.
@@ -8,8 +11,8 @@ Import ListNotations.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
-Require Import comobj.SilentEvents.
-Import SilentEvents.
+Require Import comobj.SilEvents.
+Import SilEvents.
 Require Import comobj.LCoalg.
 
 (** * Communicating Objects *)
@@ -73,12 +76,67 @@ End TSIL.
 
 Global Hint Extern 1 (DCPO (Tsil _ _)) => simple eapply @Tsil_dcpo : typeclass_instances.
 
-(** ** Communicating Objects *)
-Abbreviation comobj := (lcoalg Tsil).
+Section TSIL_MAP.
+  Context {E E' S S' : Type} {Sdcpo : DCPO S} {Sdcpo' : DCPO S'}.
+
+  Definition Tsil_map (l : SilEvents.m E E') (h : S -> S') (t : Tsil E S) : Tsil E' S' :=
+    match t with
+    | ↺ => ↺
+    | -a-> s => -(SilEvents.ext l a)-> h s
+    end.
+
+  Lemma Tsil_map_mon l h `{!PreContinuous h} : Monotonic (Tsil_map l h) (lce ++> lce).
+  Proof.
+    intros t u Htu. inversion Htu as [? | [a s] [a' s'] [Ha Hs]]; subst; cbn.
+    - constructor.
+    - cbn in Ha. subst a'. constructor. split; [reflexivity | exact (pc_mon (f := h) s s' Hs)].
+  Qed.
+
+  Lemma Tsil_map_strict l h : Strict (Tsil_map l h).
+  Proof. unfold Strict. rewrite !Tsil_bot. reflexivity. Qed.
+
+  Definition Tsil_map_pc l h `{!PreContinuous h} : PreContinuous (Tsil_map l h) :=
+    {| pc_mon := Tsil_map_mon l h; pc_strict := Tsil_map_strict l h |}.
+End TSIL_MAP.
+
+Module TsilF <: Bifunctor SilEvents PreDCPO PreDCPO.
+  Definition omap (E : SilEvents.t) (S : PreDCPO.t) : PreDCPO.t :=
+    PreDCPO.mkt (Tsil E (PreDCPO.carrier S)).
+
+  Definition fmap {E1 S1 E2 S2} (l : SilEvents.m E1 E2) (h : PreDCPO.m S1 S2) :
+    PreDCPO.m (omap E1 S1) (omap E2 S2) :=
+    @PreDCPO.mkm (omap E1 S1) (omap E2 S2)
+      (Tsil_map l (PreDCPO.apply _ _ h)) (Tsil_map_pc l (PreDCPO.apply _ _ h)).
+
+  Proposition fmap_id E S :
+    fmap (SilEvents.id E) (PreDCPO.id S) = PreDCPO.id (omap E S).
+  Proof. apply PreDCPO.meq. intros [| [[e |] s]]; reflexivity. Qed.
+
+  Proposition fmap_compose {E1 S1 E2 S2 E3 S3}
+      (l' : SilEvents.m E2 E3) (h' : PreDCPO.m S2 S3)
+      (l : SilEvents.m E1 E2) (h : PreDCPO.m S1 S2) :
+    fmap (SilEvents.compose l' l) (PreDCPO.compose h' h) =
+      PreDCPO.compose (fmap l' h') (fmap l h).
+  Proof.
+    apply PreDCPO.meq. intros [| [[e |] s]]; cbn; [reflexivity | | reflexivity].
+    unfold SilEvents.compose. destruct (l e); reflexivity.
+  Qed.
+
+  Include BifunctorTheory SilEvents PreDCPO PreDCPO.
+End TsilF.
+
+(** ** LTSs with Silent Events *)
+Module SilLTS := LCoalg SilEvents TsilF.
+Import SilLTS.
+
+Global Instance T_finitary {E S} `{DCPO S} `{!Finitary (R := lce (P := S))} :
+  Finitary (R := lce (P := T E S)) := Tsil_finitary.
+
+Abbreviation SilLTS := lcoalg.
 
 (** ** Simple Communicating Objects *)
 
 (** The communicating object [sil_loop] consists of a single non-diverging
 state [tt] and a silent-loop on it. *)
-Definition sil_loop E : comobj E (lift unit eq) :=
-  flat_lcoalg Tsil (fun s => {{-ɛ-> ↑s}}) (fun _ => True).
+Definition sil_loop E : SilLTS E (lift unit eq) :=
+  flat_lcoalg (fun s => {{-ɛ-> ↑s}}) (fun _ => True).

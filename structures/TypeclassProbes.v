@@ -16,7 +16,10 @@ Timeout 5 Fail Definition neg_finitary_lce := (_ : Finitary (R := lce (P := _)))
 Timeout 5 Fail Definition neg_po_lce := (_ : PartialOrder (lce (P := _))).
 Timeout 5 Fail Definition neg_pointed_lce := (_ : Pointed (lce (P := _))).
 Timeout 5 Fail Definition neg_em_dcpo := (_ : DCPO (convex_set _)).
+Timeout 5 Fail Definition neg_emcomplete := (_ : EMComplete _).
 Timeout 5 Fail Definition neg_lift_po := (_ : PartialOrder (_ : relation (lift _ _))).
+Timeout 5 Fail Definition neg_precont := (_ : PreContinuous _).
+Timeout 5 Fail Definition neg_strict := (_ : Strict _).
 
 Section PROBE_DCPO.
   Context `{DCPO}.
@@ -34,6 +37,13 @@ Section PROBE_FINITARY.
   Context `{DCPO} `{!Finitary (R := lce)}.
   Timeout 5 Definition probe_em_bot_fin : (bot : convex_set P) = div_set := eq_refl.
 End PROBE_FINITARY.
+
+Section PROBE_PRECONT.
+  Context {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!ScottContinuous true f}.
+  Timeout 5 Definition probe_sc_precont := (_ : PreContinuous f).
+  Timeout 5 Definition probe_sc_strict := strict_bot (f := f).
+  Timeout 5 Definition probe_sc_mon := (pc_mon (f := f) : Monotonic f (lce ++> lce)).
+End PROBE_PRECONT.
 
 Timeout 5 Definition probe_lift_bot := (bot : lift nat eq).
 Timeout 5 Definition probe_prod_dcpo := (_ : DCPO (lift nat eq * (nat -> lift nat eq))).

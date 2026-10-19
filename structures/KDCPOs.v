@@ -323,3 +323,48 @@ Module WSDCPO_KDCPO_Inclusion (Ar : KArity).
   End JFaithful.
 
 End WSDCPO_KDCPO_Inclusion.
+
+(** Keeping track of a choice size [K] can get complicated. A possibility is 
+  to define a notion of continuity that existentially quantifies over [K]:
+  [exists K, KContinuous K f] 
+  Classically, morphisms will compose as given [f] K-continuous and [g] K'-continuous, 
+  either [K] is larger than [K'] or [K'] is larger than [K], so we may take the largest of the 
+  two as the resulting continuity assumption.
+  
+  A simpler alternative, is to only assume morphims are "pre-continuous", i.e. strict monotonic functions 
+  between DCPOs. This does not allow to obtain any commutation with directed sups, but allows for computing
+  fixpoints. *)
+Module PreDCPO <: ConcreteCategory.
+
+  Class Structure (P : Type) : Type :=
+    structure_dcpo : DCPO P.
+
+  #[global] Typeclasses Transparent Structure.    
+
+  Global Hint Immediate structure_dcpo : typeclass_instances.
+  Global Hint Extern 1 (Structure _) => red : typeclass_instances.
+
+  Class Morphism {A B} `{Adcpo: DCPO A} `{Bdcpo: DCPO B} (f : A -> B) :=
+    morphism_precont : PreContinuous f.
+
+  Global Hint Immediate morphism_precont : typeclass_instances.
+  Global Hint Extern 1 (Morphism _) => red : typeclass_instances.
+
+  Global Instance id_mor `{DCPO} :
+    Morphism (fun x => x).
+  Proof.
+    typeclasses eauto.
+  Qed.
+
+  Global Instance compose_mor :
+    forall {A B C} `{DCPO A} `{DCPO B} `{DCPO C} (g: B -> C) (f: A -> B),
+      Morphism g ->
+      Morphism f ->
+      Morphism (fun x => g (f x)).
+  Proof.
+    typeclasses eauto.
+  Qed.
+
+  Include ConcreteCategoryTheory.
+
+End PreDCPO.

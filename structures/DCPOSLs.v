@@ -887,11 +887,11 @@ Class IsFDCPOSL (K : Type) (P F : Type) `{Pdcpo : DCPO P} `{Fdcposl : DCPOSL F} 
     emb_sc :: ScottContinuous true emb;
     ext {D} `{Ddcposl : DCPOSL D} : (P -> D) -> F -> D;
 
-    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f} ::
+    ext_mor {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !PreContinuous f} ::
       DCPOSLMorphism K (ext f);
-    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f} :
+    ext_ana {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !PreContinuous f} :
       forall p, ext f (emb p) = f p;
-    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f}
+    ext_unique {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !PreContinuous f}
       (g : F -> D) `{Hg : !DCPOSLMorphism K g} :
       (forall p, g (emb p) = f p) -> forall x, g x = ext f x;
   }.
@@ -1076,7 +1076,7 @@ Section EM_DOMAIN_FREE.
   Qed.
 
   Section EM_EXT_MOR.
-    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !Monotonic f (lce ++> lce)} `{Hf_strict : !Strict f}.
+    Context {D} `{Ddcposl : DCPOSL D} (f : P -> D) `{Hf : !PreContinuous f}.
 
     Lemma em_ext_mon : Monotonic (em_ext f) (em_le ++> lce).
     Proof.
@@ -1106,7 +1106,7 @@ Section EM_DOMAIN_FREE.
         rewrite Hu, Hv.
         (* now both joins are over K, and K-continuity applies *)
         apply lsup_mon. intros [[a b] [xa [yb ab]]]. unfold u, v. cbn.
-        apply Hf. exact ab.
+        apply (pc_mon (f := f)). exact ab.
       - (* y is empty, so x is contained in {bot} *)
         transitivity (lsup (fun _ : {p : P | x p} => lsup (fun q : {q : P | y q} => f (`q)))).
         + apply lsup_mon. intros [a xa]. cbn.
@@ -1142,7 +1142,7 @@ Section EM_DOMAIN_FREE.
     Qed.
 
     Global Instance em_ext_sup_sc_cont : SupContinuous (em_ext f) :=
-      em_ext_sup_cont f (Hf := Hf).
+      em_ext_sup_cont f (Hf := pc_mon (f := f)).
   End EM_EXT_MOR.
 End EM_DOMAIN_FREE.
 
@@ -1193,9 +1193,9 @@ Section EM_FREE.
   Next Obligation.
     split.
     - split.
-      + apply (em_ext_mon (Hf_strict := Hf_strict) f).
-      + intros J x Dx Kx y Hy. 
-        apply (em_ext_kcont_large (Hf_strict := Hf_strict) f r Hsurj); assumption.
+      + apply (em_ext_mon (Hf := Hf) f).
+      + intros J x Dx Kx y Hy.
+        apply (em_ext_kcont_large (Hf := Hf) f r Hsurj); assumption.
     - exact (em_ext_sup_sc_cont f).
   Qed.
   Next Obligation.
@@ -1214,6 +1214,18 @@ Section EM_FREE_FINITARY.
     IsFDCPOSL K P (convex_set P) :=
     em_fdcposl (@dsup_is_sup _ em_dcpo) (@sup_kcont _ em_dcposl) r Hsurj.
 End EM_FREE_FINITARY.
+
+Class EMComplete P `{DCPO P} :=
+  em_complete : forall {I} (x : I -> convex_set P) `{!Directed (R := em_le) x},
+    IsSup (R := em_le) x (dsup_em x).
+
+Global Hint Mode EMComplete ! - : typeclass_instances.
+
+Global Instance finitary_em_complete `{DCPO} `{!Finitary (R := lce)} : EMComplete P :=
+  fun I x Hx => @dsup_is_sup _ em_dcpo I x Hx.
+
+Definition em_dcpo_complete `{DCPO} `{!EMComplete P} : DCPO (convex_set P) :=
+  em_dcpo_gen (@em_complete P _ _).
 
 (** ** The EM Powerdomain Relative Monad *)
 
@@ -1343,7 +1355,7 @@ Section EM_RELATIVE_MONAD.
   Section CONVEX_MAP_MON.
     Context {X Y} {lceX : relation X} {Xpo : PartialOrder lceX} {Xpt : Pointed lceX}
       {lceY : relation Y} {Ypo : PartialOrder lceY} {Ypt : Pointed lceY}
-      (f : X -> Y) `{Hf : !Monotonic f (lceX ++> lceY)} `{Hf_strict : !Strict f}.
+      (f : X -> Y) `{Hf : !PreContinuous f}.
 
     Lemma convex_map_mon : Monotonic (convex_map f) (em_le ++> em_le).
     Proof.
@@ -1359,7 +1371,7 @@ Section EM_RELATIVE_MONAD.
         destruct (fw q Hq Hq_nbot) as [q' [Hq' lce_q_q']].
         exists (f q'). split.
         + apply chull_extensive. exists (exist _ q' Hq'). reflexivity.
-        + transitivity (f q); [exact lce_a_hi | apply Hf; exact lce_q_q'].
+        + transitivity (f q); [exact lce_a_hi | apply (pc_mon (f := f)); exact lce_q_q'].
       - (* bw: [b] is above some [f p'] with [p'] in [x'], justified by [p] in [x] *)
         intros b Hb.
         destruct Hb as [lo [hi [[[p' Hp'] Hlo] [_ [lce_lo_b _]]]]].
@@ -1367,7 +1379,7 @@ Section EM_RELATIVE_MONAD.
         destruct (bw p' Hp') as [p [Hp lce_p_p']].
         exists (f p). split.
         + apply chull_extensive. exists (exist _ p Hp). reflexivity.
-        + transitivity (f p'); [apply Hf; exact lce_p_p' | exact lce_lo_b].
+        + transitivity (f p'); [apply (pc_mon (f := f)); exact lce_p_p' | exact lce_lo_b].
     Qed.
   End CONVEX_MAP_MON.
 
@@ -1418,7 +1430,7 @@ Section EM_RELATIVE_MONAD.
       Lemma convex_map_kcont : KContinuous K (convex_map f).
       Proof.
         split.
-        - exact (convex_map_mon f (Hf := sc_lce) (Hf_strict := sc_strict f)).
+        - exact (convex_map_mon f (Hf := sc_precont f)).
         - intros I x Dx Kx y Hy. apply (convex_map_dsup_em x). exact Hy.
       Qed.
     End CONVEX_MAP_KCONT_INSTANCE.

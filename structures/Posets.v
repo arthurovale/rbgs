@@ -190,3 +190,32 @@ Lemma strict_lb {A B} {RA : relation A} {RB : relation B}
 Proof.
   rewrite (strict_bot (f := f)). apply bot_lb.
 Qed.
+
+Class PreContinuous {A B} {RA : relation A} {RB : relation B}
+    `{POA : !PartialOrder RA} `{POB : !PartialOrder RB}
+    `{PA : !Pointed RA} `{PB : !Pointed RB} (f : A -> B) :=
+  {
+    pc_mon :: Monotonic f (RA ++> RB);
+    pc_strict :: Strict (RA := RA) (RB := RB) f;
+  }.
+
+Global Hint Mode PreContinuous - - - - - - - - ! : typeclass_instances.
+
+Global Instance pc_id {A} {RA : relation A} `{!PartialOrder RA} `{!Pointed RA} :
+  PreContinuous (RA := RA) (RB := RA) (fun a => a).
+Proof.
+  split.
+  - intros x y Hxy. exact Hxy.
+  - reflexivity.
+Qed.
+
+Global Instance pc_compose {A B C} {RA : relation A} {RB : relation B} {RC : relation C}
+    `{!PartialOrder RA} `{!PartialOrder RB} `{!PartialOrder RC}
+    `{!Pointed RA} `{!Pointed RB} `{!Pointed RC} (g : B -> C) (f : A -> B)
+    `{!PreContinuous (RA := RB) (RB := RC) g} `{!PreContinuous (RA := RA) (RB := RB) f} :
+  PreContinuous (RA := RA) (RB := RC) (fun a => g (f a)).
+Proof.
+  split.
+  - intros x y Hxy. apply (pc_mon (f := g)), (pc_mon (f := f)), Hxy.
+  - unfold Strict. rewrite (strict_bot (f := f)). apply (strict_bot (f := g)).
+Qed.

@@ -202,7 +202,7 @@ Module SilentEventsBicartesian <: BicartesianCategory.
 
 End SilentEventsBicartesian.
 
-Module SilentEvents <: BicartesianCategory.
+Module SilEvents <: BicartesianCategory.
   Include SilentEventsBicartesian.
 
   Notation "⟨ a | b ⟩" := (Prod.sync a b) (at level 0).
@@ -291,4 +291,4 @@ Module SilentEvents <: BicartesianCategory.
       destruct x; destruct y; reflexivity.
     Qed.
 
-End SilentEvents.
+End SilEvents.

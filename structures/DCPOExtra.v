@@ -36,12 +36,18 @@ Qed.
 
 (** [Strict] is defined over pointed orders in [Posets]; here are the two
   derivations for DCPOs. Strict Scott-continuity implies strictness. *)
-Global Instance sc_strict {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!ScottContinuous true f} :
-  Strict f := sc_bot.
+Global Instance sc_precont {A B} `{DCPO A} `{DCPO B} (f : A -> B) `{!ScottContinuous true f} :
+  PreContinuous f.
+Proof.
+  split.
+  - exact (sc_lce (strict := true)).
+  - exact sc_bot.
+Qed.
 
 (** So does [K]-continuity for inhabited [K]. *)
-Definition kcont_strict {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B} (f : A -> B)
-    `{!KContinuous K f} : Strict f := kc_strict inK f.
+Definition kcont_precont {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B} (f : A -> B)
+    `{!KContinuous K f} : PreContinuous f :=
+  {| pc_mon := kc_lce (K := K); pc_strict := kc_strict inK f |}.
 
 Section PROD.
   Context {P Q : Type} {R : relation P} {S : relation Q}
@@ -261,6 +267,14 @@ Proof.
   inversion Htu; subst; cbn; [apply bot_lb | reflexivity].
 Qed.
 
+Global Instance lift_ext_flat_pc {X D} {RD : relation D} `{!PartialOrder RD} `{!Pointed RD} (f : X -> D) :
+  PreContinuous (RA := lce) (RB := RD) (lift_ext (R := eq) f).
+Proof.
+  split.
+  - exact (lift_ext_flat_mon f).
+  - exact (lift_ext_strict f).
+Qed.
+
 Global Instance lift_ext_flat_sc {X D} `{DCPO D} (f : X -> D) :
   ScottContinuous true (lift_ext (R := eq) (RD := lce) f).
 Proof.
@@ -350,10 +364,10 @@ Qed.
   Scott-continuous. *)
 
 Lemma finitary_sc {A B} `{DCPO A} `{!Finitary (R := lce (P := A))} `{DCPO B} (f : A -> B)
-    (Hmon : Monotonic f (lce ++> lce)) `{!Strict f} :
+    `{Hf : !PreContinuous f} :
   ScottContinuous true f.
 Proof.
-  split; [exact Hmon |].
+  split; [exact (pc_mon (f := f)) |].
   intros J HJ x Dx y Hy.
   destruct (classic (inhabited J)) as [Hinh | Hemp].
   - destruct (finitary_DCPO_acc x (inhabited0 := Hinh)) as [i Hi].

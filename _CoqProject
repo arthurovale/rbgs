@@ -46,9 +46,10 @@ structures/KDCPOs.v
 structures/DCPOSLs.v
 
 # Communicating Objects
-comobj/SilentEvents.v
+comobj/SilEvents.v
 comobj/Sig.v
 comobj/LCoalg.v
-comobj/ComObj.v
+comobj/SilLTS.v
+comobj/VisLTS.v
 
 structures/TypeclassProbes.v

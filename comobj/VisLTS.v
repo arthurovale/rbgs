@@ -1,6 +1,10 @@
+Require Import interfaces.Category.
+Require Import interfaces.Functor.
+
 Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
+Require Import structures.KDCPOs.
 Require Import structures.DCPOSLs.
 
 Require Import Stdlib.Lists.List.
@@ -8,11 +12,11 @@ Import ListNotations.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
-Require Import comobj.SilentEvents.
-Import SilentEvents.
+Require Import comobj.SilEvents.
+Import SilEvents.
 
 Require Import comobj.LCoalg.
-Require Import comobj.ComObj.
+Require Import comobj.SilLTS.
 
 
 (** * The Silencing Operator *)
@@ -96,13 +100,23 @@ Section TVIS.
     rewrite <- Tvis_bot. apply strict_bot.
   Qed.
 
+  Lemma Tsil_copair_pc {X} `{DCPO X} (fl : Tvis E S -> X) (fr : S -> X)
+      `{!PreContinuous fl} (Hr : Monotonic fr (lce ++> lce))
+      (Hglue : lce (fl ↺) (fr bot)) :
+    PreContinuous (Tsil_copair fl fr).
+  Proof.
+    split.
+    - apply Tsil_copair_mon; [exact (pc_mon (f := fl)) | exact Hr | exact Hglue].
+    - exact (Tsil_copair_strict fl fr).
+  Qed.
+
   Lemma Tsil_copair_sc {X} `{DCPO X} `{!Finitary (R := lce (P := S))}
       (fl : Tvis E S -> X) (fr : S -> X)
-      (Hl : Monotonic fl (lce ++> lce)) (Hr : Monotonic fr (lce ++> lce))
-      (Hglue : lce (fl ↺) (fr bot)) `{!Strict fl} :
+      `{!PreContinuous fl} (Hr : Monotonic fr (lce ++> lce))
+      (Hglue : lce (fl ↺) (fr bot)) :
     ScottContinuous true (Tsil_copair fl fr).
   Proof.
-    apply finitary_sc. apply Tsil_copair_mon; assumption. typeclasses eauto.
+    exact (finitary_sc (Tsil_copair fl fr) (Hf := Tsil_copair_pc fl fr Hr Hglue)).
   Qed.
 
   (** By the same isomorphism above, [Tvis] injects into [Tsil] by a map 
@@ -147,61 +161,124 @@ Section TVIS.
     injection He as <-. split; [reflexivity | exact Hc].
   Qed.
 
-  Global Instance tvis_tsil_strict : Strict tvis_tsil.
+  Lemma tvis_tsil_strict : Strict tvis_tsil.
   Proof.
     unfold Strict. rewrite Tvis_bot, Tsil_bot. reflexivity.
   Qed.
 
-  Global Instance tsil_tvis_strict : Strict tsil_tvis.
+  Lemma tsil_tvis_strict : Strict tsil_tvis.
   Proof.
     unfold Strict. rewrite Tsil_bot, Tvis_bot. reflexivity.
   Qed.
 
+  Global Instance tvis_tsil_pc : PreContinuous tvis_tsil :=
+    {| pc_mon := tvis_tsil_mon; pc_strict := tvis_tsil_strict |}.
+
+  Global Instance tsil_tvis_pc : PreContinuous tsil_tvis :=
+    {| pc_mon := tsil_tvis_mon; pc_strict := tsil_tvis_strict |}.
+
   Global Instance tvis_tsil_sc `{!Finitary (R := lce (P := S))} : ScottContinuous true tvis_tsil :=
-    finitary_sc tvis_tsil tvis_tsil_mon.
+    finitary_sc tvis_tsil (Hf := tvis_tsil_pc).
 
   Global Instance tsil_tvis_sc `{!Finitary (R := lce (P := S))} : ScottContinuous true tsil_tvis :=
-    finitary_sc tsil_tvis tsil_tvis_mon.
+    finitary_sc tsil_tvis (Hf := tsil_tvis_pc).
 End TVIS.
 
 Global Hint Extern 1 (DCPO (Tvis _ _)) => simple eapply @Tvis_dcpo : typeclass_instances.
 
-(** A behaviour object is then a labelled coalgebra with visible transitions *)
+(** A visible LTS is then a labelled coalgebra with visible transitions *)
 
-Abbreviation behobj := (lcoalg Tvis).
+Section TVIS_MAP.
+  Context {E E' S S' : Type} {Sdcpo : DCPO S} {Sdcpo' : DCPO S'}.
 
-Program Definition behobj_to_silobj {E S} {Sdcpo : DCPO S} (α : behobj E S) : comobj E S := 
+  Definition Tvis_map (l : E -> E') (h : S -> S') (t : Tvis E S) : Tvis E' S' :=
+    match t with
+    | ↺ => ↺
+    | -e-> s => -(l e)-> h s
+    end.
+
+  Lemma Tvis_map_mon l h `{!PreContinuous h} : Monotonic (Tvis_map l h) (lce ++> lce).
+  Proof.
+    intros t u Htu. inversion Htu as [? | [a s] [a' s'] [Ha Hs]]; subst; cbn.
+    - constructor.
+    - cbn in Ha. subst a'. constructor. split; [reflexivity | exact (pc_mon (f := h) s s' Hs)].
+  Qed.
+
+  Lemma Tvis_map_strict l h : Strict (Tvis_map l h).
+  Proof. unfold Strict. rewrite !Tvis_bot. reflexivity. Qed.
+
+  Definition Tvis_map_pc l h `{!PreContinuous h} : PreContinuous (Tvis_map l h) :=
+    {| pc_mon := Tvis_map_mon l h; pc_strict := Tvis_map_strict l h |}.
+End TVIS_MAP.
+
+Module TvisF <: Bifunctor SET PreDCPO PreDCPO.
+  Definition omap (E : Type) (S : PreDCPO.t) : PreDCPO.t :=
+    PreDCPO.mkt (Tvis E (PreDCPO.carrier S)).
+
+  Definition fmap {E1 S1 E2 S2} (l : E1 -> E2) (h : PreDCPO.m S1 S2) :
+    PreDCPO.m (omap E1 S1) (omap E2 S2) :=
+    @PreDCPO.mkm (omap E1 S1) (omap E2 S2)
+      (Tvis_map l (PreDCPO.apply _ _ h)) (Tvis_map_pc l (PreDCPO.apply _ _ h)).
+
+  Proposition fmap_id E S :
+    fmap id (PreDCPO.id S) = PreDCPO.id (omap E S).
+  Proof. apply PreDCPO.meq. intros [| [e s]]; reflexivity. Qed.
+
+  Proposition fmap_compose {E1 S1 E2 S2 E3 S3}
+      (l' : E2 -> E3) (h' : PreDCPO.m S2 S3)
+      (l : E1 -> E2) (h : PreDCPO.m S1 S2) :
+    fmap (l ;; l') (PreDCPO.compose h' h) =
+      PreDCPO.compose (fmap l' h') (fmap l h).
+  Proof.
+    apply PreDCPO.meq. intros [| [e s]]; cbn; [reflexivity | reflexivity].
+  Qed.
+
+  Include BifunctorTheory SET PreDCPO PreDCPO.
+End TvisF.
+
+(** ** LTSs with only Visible Events *)
+Module VisLTS := LCoalg SET TvisF.
+Import (hints, coercions) SilLTS.
+Import (hints, coercions) VisLTS.
+
+Global Instance T_finitary {E S} `{DCPO S} `{!Finitary (R := lce (P := S))} :
+  Finitary (R := lce (P := VisLTS.T E S)) := Tvis_finitary.
+
+Abbreviation VisLTS := VisLTS.lcoalg.
+
+Program Definition VisLTS_to_SilLTS {E S} {Sdcpo : DCPO S} (α : VisLTS E S) : SilLTS E S := 
   {|
-    trans := trans α ;; convex_map tvis_tsil;
-    init := init α
+    SilLTS.trans := VisLTS.trans α ;; convex_map tvis_tsil;
+    SilLTS.init := VisLTS.init α
   |}.
 Next Obligation.
-  intros s s' Hs. apply (convex_map_mon tvis_tsil (Hf := tvis_tsil_mon)). exact (trans_mon α s s' Hs).
-Qed.
-Next Obligation.
-  unfold Strict. lazy beta.
-  etransitivity; [exact (f_equal (convex_map tvis_tsil) (strict_bot (f := trans α))) |].
-  unfold convex_map.
-  etransitivity; [exact (em_ext_bot _) |]. lazy beta.
-  etransitivity; [exact (f_equal {{-}} (strict_bot (f := tvis_tsil))) |].
-  exact em_emb_bot.
+  split.
+  - intros s s' Hs. apply (convex_map_mon tvis_tsil (Hf := tvis_tsil_pc)).
+    exact (pc_mon (PreContinuous := VisLTS.trans_pc α) s s' Hs).
+  - unfold Strict. lazy beta.
+    etransitivity; [exact (f_equal (convex_map tvis_tsil) (strict_bot (f := VisLTS.trans α))) |].
+    unfold convex_map.
+    etransitivity; [exact (em_ext_bot _) |]. lazy beta.
+    pose proof (strict_bot (f := tvis_tsil (E := E) (S := S))) as Hs.
+    etransitivity; [exact (f_equal {{-}} Hs) |].
+    exact em_emb_bot.
 Qed.
 
 (** ** Simple Behaviour Objects *)
 
-Definition beh_div {E} : behobj E (lift unit eq) := 
-  flat_lcoalg Tvis (fun s => {{↺}}) (fun _ => True).
+Definition vis_div {E} : VisLTS E (lift unit eq) := 
+  VisLTS.flat_lcoalg (fun s => {{↺}}) (fun _ => True).
 
 (** ** Loud Communicating Objects *)
 
 (** A loud communicating object is one that has no silent transitions. 
   This is nicely defined as a communicating object that factors through 
   the retraction [tvis_tsil]. *)
-Definition loud {E S} `{Sdcpo : DCPO S} (α : comobj E S) (α_vis : behobj E S) :=
-  α_vis ;; convex_map tvis_tsil = α /\ init α_vis = init α.
+Definition loud {E S} `{Sdcpo : DCPO S} (α : SilLTS E S) (α_vis : VisLTS E S) :=
+  α_vis ;; convex_map tvis_tsil = α /\ VisLTS.init α_vis = SilLTS.init α.
 
 (** And since the map is a retraction it is mono, so factorings are unique. **)
-Lemma loud_unique_trans {E S} `{Sdcpo : DCPO S} {α : comobj E S} {α_vis : behobj E S} {α_vis' : behobj E S} :
+Lemma loud_unique_trans {E S} `{Sdcpo : DCPO S} {α : SilLTS E S} {α_vis : VisLTS E S} {α_vis' : VisLTS E S} :
  loud α α_vis -> loud α α_vis' -> α_vis = α_vis' :> (S -> convex_set (Tvis E S)).
 Proof.
   intros [H _] [H' _]. apply functional_extensionality. intros s.
@@ -214,26 +291,26 @@ Proof.
   etransitivity; [exact H | symmetry; exact H'].
 Qed.
 
-Lemma loud_unique {E S} `{Sdcpo : DCPO S} {α : comobj E S} {α_vis : behobj E S} {α_vis' : behobj E S} :
-  loud α α_vis -> loud α α_vis' -> init α_vis = init α_vis' -> α_vis = α_vis'.
+Lemma loud_unique {E S} `{Sdcpo : DCPO S} {α : SilLTS E S} {α_vis : VisLTS E S} {α_vis' : VisLTS E S} :
+  loud α α_vis -> loud α α_vis' -> VisLTS.init α_vis = VisLTS.init α_vis' -> α_vis = α_vis'.
 Proof.
-  intros H H' Hi. apply lcoalg_ext; [exact (loud_unique_trans H H') | exact Hi].
+  intros H H' Hi. apply VisLTS.lcoalg_ext; [exact (loud_unique_trans H H') | exact Hi].
 Qed.
 
-(** [behobj_to_silobj] is indeed an embedding *)
+(** [VisLTS_to_SilLTS] is indeed an embedding *)
 
-Lemma behobj_to_silobj_loud {E S} {Sdcpo : DCPO S} (α : behobj E S) :
-  loud (behobj_to_silobj α) α.
+Lemma VisLTS_to_SilLTS_loud {E S} {Sdcpo : DCPO S} (α : VisLTS E S) :
+  loud (VisLTS_to_SilLTS α) α.
 Proof.
   split; reflexivity.
 Qed.
 
-Lemma behobj_to_silobj_inj {E S} {Sdcpo : DCPO S} (α β : behobj E S) :
-  behobj_to_silobj α = behobj_to_silobj β -> α = β.
+Lemma VisLTS_to_SilLTS_inj {E S} {Sdcpo : DCPO S} (α β : VisLTS E S) :
+  VisLTS_to_SilLTS α = VisLTS_to_SilLTS β -> α = β.
 Proof.
   intros H.
-  assert (Lβ : loud (behobj_to_silobj α) β) by (rewrite H; split; reflexivity).
-  apply (loud_unique (behobj_to_silobj_loud α) Lβ). exact (f_equal init H).
+  assert (Lβ : loud (VisLTS_to_SilLTS α) β) by (rewrite H; split; reflexivity).
+  apply (loud_unique (VisLTS_to_SilLTS_loud α) Lβ). exact (f_equal SilLTS.init H).
 Qed.
 
 (** ** The Silencing Operator *)
@@ -245,36 +322,40 @@ Qed.
 (** First, we define a functional operator that filters a visible step. 
   On a visible transition, it simply uses the singleton map, while on a silent 
   transition it iterates the candidate. *)
-Definition vstep {E S} `{Sdcpo : DCPO S} (g : behobj E S) : Tsil E S -> convex_set (Tvis E S) :=
+Definition vstep {E S} `{Sdcpo : DCPO S} (g : VisLTS E S) : Tsil E S -> convex_set (Tvis E S) :=
   Tsil_copair {{-}} g.
 
 (** [vstep] is monotonic in both the candidate and the input transition *)
-Lemma vstep_mono_l {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g g' : behobj E S) :
+Lemma vstep_mono_l {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g g' : VisLTS E S) :
   lce g g' -> forall t, lce (vstep g t) (vstep g' t).
 Proof.
   intros Hg. apply Tsil_copair_mon_r. exact (proj1 Hg).
 Qed.
 
-Lemma vstep_mono_r {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : behobj E S) :
+Lemma vstep_mono_r {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : VisLTS E S) :
   Monotonic (vstep g) (lce ++> lce).
 Proof.
   apply Tsil_copair_mon.
   - exact em_emb_mon.
-  - exact (trans_mon g).
-  - rewrite <- Tvis_bot, em_emb_bot, (strict_bot (f := trans g)). reflexivity.
+  - exact (pc_mon (PreContinuous := VisLTS.trans_pc g)).
+  - rewrite <- Tvis_bot, em_emb_bot, (strict_bot (f := VisLTS.trans g)). reflexivity.
 Qed.
 
 (** [vstep] is strict *)
-Lemma vstep_bot {E S} `{Sdcpo : DCPO S} (g : behobj E S) : vstep g bot = div_set.
+Lemma vstep_bot {E S} `{Sdcpo : DCPO S} (g : VisLTS E S) : vstep g bot = div_set.
 Proof.
   unfold vstep. rewrite Tsil_bot. cbn [Tsil_copair]. rewrite <- Tvis_bot. apply em_emb_bot.
 Qed.
 
-Lemma vstep_strict {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : behobj E S) :
+Lemma vstep_strict {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : VisLTS E S) :
   Strict (RB := lce) (POB := lce_po) (PB := dcpo_pointed) (vstep g).
 Proof.
   unfold Strict. rewrite vstep_bot. apply (antisymmetry (R := lce)); [apply div_set_bot | apply bot_lb].
 Qed.
+
+Definition vstep_pc {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : VisLTS E S) :
+  PreContinuous (RB := lce) (POB := lce_po) (PB := dcpo_pointed) (vstep g) :=
+  {| pc_mon := vstep_mono_r g; pc_strict := vstep_strict g |}.
 
 (** The functional operator proper is defined on transitions by: 
 [g] ↦ [α ;; em_ext (vstep g)].
@@ -284,36 +365,31 @@ That is, we take a step of the communicating object α,
 
 To be able to compute its fixpoint, we show it is pre-continuous.
 *)
-Lemma Φ_silence_trans_mon {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
-    (α : comobj E S) (g : behobj E S) :
-  Monotonic (α ;; em_ext (vstep g)) (lce ++> em_le).
+Lemma Φ_silence_trans_pc {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
+    (α : SilLTS E S) (g : VisLTS E S) :
+  PreContinuous (RB := em_le) (α ;; em_ext (vstep g)).
 Proof.
-  intros s s' Hs.
-  exact (em_ext_mon (vstep g) (Hf := vstep_mono_r g) (Hf_strict := vstep_strict g)
-           (α s) (α s') (trans_mon α s s' Hs)).
-Qed.
-
-Lemma Φ_silence_trans_strict {E S} `{Sdcpo : DCPO S} (α : comobj E S) (g : behobj E S) :
-  Strict (RB := em_le) (α ;; em_ext (vstep g)).
-Proof.
-  unfold Strict. rewrite (strict_bot (f := trans α)), em_ext_bot. apply vstep_bot.
+  split.
+  - intros s s' Hs.
+    exact (em_ext_mon (vstep g) (Hf := vstep_pc g)
+             (α s) (α s') (pc_mon (PreContinuous := SilLTS.trans_pc α) s s' Hs)).
+  - unfold Strict. rewrite (strict_bot (f := SilLTS.trans α)), em_ext_bot. apply vstep_bot.
 Qed.
 
 (** The functional proper is defined on coalgebras directly. *)
 Definition Φ_silence {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
-    (α : comobj E S) (g : behobj E S) : behobj E S :=
+    (α : SilLTS E S) (g : VisLTS E S) : VisLTS E S :=
   {|
-    trans := α ;; em_ext (vstep g);
-    init := init α;
-    trans_mon := Φ_silence_trans_mon α g;
-    trans_strict := Φ_silence_trans_strict α g;
+    VisLTS.trans := α ;; em_ext (vstep g);
+    VisLTS.init := SilLTS.init α;
+    VisLTS.trans_pc := Φ_silence_trans_pc α g;
   |}.
 
-Lemma Φ_silence_mon {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : comobj E S) :
+Lemma Φ_silence_mon {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : SilLTS E S) :
   Monotonic (Φ_silence α) (lce ++> lce).
 Proof.
   intros g g' Hg. split.
-  - intros s. unfold Φ_silence. cbn [trans]. unfold em_ext.
+  - intros s. unfold Φ_silence. cbn [VisLTS.trans]. unfold em_ext.
     apply (lsup_mon (H := em_dcposl (P := Tvis E S))).
     intros [p Hp]. apply vstep_mono_l. exact Hg.
   - reflexivity.
@@ -322,10 +398,10 @@ Qed.
 (** [Φ_silence α] is monotonic but not Scott-continuous for arbitrary
   directed families when [S] has infinite silent branching, so the least
   fixpoint is taken by transfinite iteration. *)
-Definition silence {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : comobj E S) : behobj E S :=
+Definition silence {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : SilLTS E S) : VisLTS E S :=
   TFP.lfp (Φ_silence α) (Hf := Φ_silence_mon α).
 
-Lemma μ_silence_fixed {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : comobj E S) :
+Lemma μ_silence_fixed {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : SilLTS E S) :
   Φ_silence α (silence α) = silence α.
 Proof.
   apply TFP.lfp_fixed.
@@ -333,39 +409,39 @@ Qed.
 
 (** ** Basic Facts *)
 
-Lemma silence_init {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : comobj E S) : 
-  init (silence α) = init α.
+Lemma silence_init {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (α : SilLTS E S) : 
+  VisLTS.init (silence α) = SilLTS.init α.
 Proof. 
   rewrite <- μ_silence_fixed. reflexivity.
 Qed.
 
 (** ** Sanity Check: silencing a silent loop yields divergence *)
 
-Lemma silence_sil_loop_div {E} : silence (sil_loop E) = beh_div.
+Lemma silence_sil_loop_div {E} : silence (sil_loop E) = vis_div.
 Proof.
   apply antisymmetry.
   - apply TFP.lfp_least_prefixed. split.
-    + intros [| []]; unfold Φ_silence, sil_loop, beh_div; cbn [trans].
-      * rewrite !flat_lcoalg_bot, em_ext_bot, vstep_bot. apply div_set_bot.
-      * rewrite !flat_lcoalg_el, em_ext_ana. reflexivity.
+    + intros [| []]; unfold Φ_silence, sil_loop, vis_div; cbn [VisLTS.trans].
+      * rewrite !SilLTS.flat_lcoalg_bot, em_ext_bot, vstep_bot. apply div_set_bot.
+      * rewrite !SilLTS.flat_lcoalg_el, em_ext_ana. reflexivity.
     + reflexivity.
   - split.
-    + intros [| []]; unfold beh_div.
-      * rewrite flat_lcoalg_bot. apply bot_lb.
-      * rewrite flat_lcoalg_el, <- Tvis_bot, em_emb_bot. apply div_set_bot.
+    + intros [| []]; unfold vis_div.
+      * rewrite VisLTS.flat_lcoalg_bot. apply bot_lb.
+      * rewrite VisLTS.flat_lcoalg_el, <- Tvis_bot, em_emb_bot. apply div_set_bot.
     + rewrite <- (μ_silence_fixed (sil_loop E)). reflexivity.
 Qed.
 
 (** Silencing a loud communicating object does nothing *)
 
-Lemma vstep_tvis_tsil {E S} `{Sdcpo : DCPO S} (g : behobj E S) :
+Lemma vstep_tvis_tsil {E S} `{Sdcpo : DCPO S} (g : VisLTS E S) :
   tvis_tsil ;; vstep g = {{-}}.
 Proof.
   apply functional_extensionality. intros [| [e c]]; reflexivity.
 Qed.
 
 Lemma em_ext_vstep_loud {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
-    (g : behobj E S) (x : convex_set (Tvis E S)) :
+    (g : VisLTS E S) (x : convex_set (Tvis E S)) :
   em_ext (vstep g) (convex_map tvis_tsil x) = x.
 Proof.
   unfold convex_map.
@@ -379,10 +455,10 @@ Proof.
 Qed.
 
 Lemma cant_silence_loud {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
-    (α : comobj E S) (α_vis : behobj E S) : loud α α_vis -> silence α = α_vis.
+    (α : SilLTS E S) (α_vis : VisLTS E S) : loud α α_vis -> silence α = α_vis.
 Proof.
-  intros [H Hi]. rewrite <- (μ_silence_fixed α). apply lcoalg_ext.
-  - apply functional_extensionality. intros s. unfold Φ_silence. cbn [trans].
+  intros [H Hi]. rewrite <- (μ_silence_fixed α). apply VisLTS.lcoalg_ext.
+  - apply functional_extensionality. intros s. unfold Φ_silence. cbn [VisLTS.trans].
     rewrite <- H. lazy beta. apply em_ext_vstep_loud.
   - symmetry. exact Hi.
 Qed.
@@ -390,7 +466,7 @@ Qed.
 (** A corollary is that [silence] is idempotent *)
 
 Lemma silence_idem {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}
-    (α : comobj E S) : silence (behobj_to_silobj (silence α)) = silence α.
+    (α : SilLTS E S) : silence (VisLTS_to_SilLTS (silence α)) = silence α.
 Proof.
-  apply cant_silence_loud. apply behobj_to_silobj_loud.
+  apply cant_silence_loud. apply VisLTS_to_SilLTS_loud.
 Qed.
