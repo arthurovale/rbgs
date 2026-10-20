@@ -216,5 +216,7 @@ Section LCOALG_DCPO.
   (** A Coalgebra is said safe if it never makes an empty choice, i.e. 
     it never gets stuck. *)
   Definition safe {E S} {Sdcpo : DCPO S} (α : lcoalg E S) := 
-    forall s, exists t, α s t. 
+    forall s, exists t, α s t.
+
+  (** TODO: Kleisli morphisms conditional on safe *)
 End LCoalg.

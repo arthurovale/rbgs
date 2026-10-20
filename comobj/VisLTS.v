@@ -38,7 +38,7 @@ Section TVIS.
 
   Local Instance Tvis_dcpo : DCPO (Tvis E S) := lift_dcpo.
 
-  Lemma Tvis_bot : (bot : Tvis E S) = ↺.
+  Lemma Tvis_bot_eq : (bot : Tvis E S) = ↺.
   Proof. apply lift_bot_eq. Qed.
 
   Global Instance Tvis_finitary `{!Finitary (R := lce (P := S))} :
@@ -97,7 +97,7 @@ Section TVIS.
     Strict (Tsil_copair fl fr).
   Proof.
     unfold Strict. rewrite Tsil_bot. change (fl ↺ = bot).
-    rewrite <- Tvis_bot. apply strict_bot.
+    rewrite <- Tvis_bot_eq. apply strict_bot.
   Qed.
 
   Lemma Tsil_copair_pc {X} `{DCPO X} (fl : Tvis E S -> X) (fr : S -> X)
@@ -163,12 +163,12 @@ Section TVIS.
 
   Lemma tvis_tsil_strict : Strict tvis_tsil.
   Proof.
-    unfold Strict. rewrite Tvis_bot, Tsil_bot. reflexivity.
+    unfold Strict. rewrite Tvis_bot_eq, Tsil_bot. reflexivity.
   Qed.
 
   Lemma tsil_tvis_strict : Strict tsil_tvis.
   Proof.
-    unfold Strict. rewrite Tsil_bot, Tvis_bot. reflexivity.
+    unfold Strict. rewrite Tsil_bot, Tvis_bot_eq. reflexivity.
   Qed.
 
   Global Instance tvis_tsil_pc : PreContinuous tvis_tsil :=
@@ -205,7 +205,7 @@ Section TVIS_MAP.
   Qed.
 
   Lemma Tvis_map_strict l h : Strict (Tvis_map l h).
-  Proof. unfold Strict. rewrite !Tvis_bot. reflexivity. Qed.
+  Proof. unfold Strict. rewrite !Tvis_bot_eq. reflexivity. Qed.
 
   Definition Tvis_map_pc l h `{!PreContinuous h} : PreContinuous (Tvis_map l h) :=
     {| pc_mon := Tvis_map_mon l h; pc_strict := Tvis_map_strict l h |}.
@@ -338,13 +338,13 @@ Proof.
   apply Tsil_copair_mon.
   - exact em_emb_mon.
   - exact (pc_mon (PreContinuous := VisLTS.trans_pc g)).
-  - rewrite <- Tvis_bot, em_emb_bot, (strict_bot (f := VisLTS.trans g)). reflexivity.
+  - rewrite <- Tvis_bot_eq, em_emb_bot, (strict_bot (f := VisLTS.trans g)). reflexivity.
 Qed.
 
 (** [vstep] is strict *)
 Lemma vstep_bot {E S} `{Sdcpo : DCPO S} (g : VisLTS E S) : vstep g bot = div_set.
 Proof.
-  unfold vstep. rewrite Tsil_bot. cbn [Tsil_copair]. rewrite <- Tvis_bot. apply em_emb_bot.
+  unfold vstep. rewrite Tsil_bot. cbn [Tsil_copair]. rewrite <- Tvis_bot_eq. apply em_emb_bot.
 Qed.
 
 Lemma vstep_strict {E S} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))} (g : VisLTS E S) :
@@ -428,7 +428,7 @@ Proof.
   - split.
     + intros [| []]; unfold vis_div.
       * rewrite VisLTS.flat_lcoalg_bot. apply bot_lb.
-      * rewrite VisLTS.flat_lcoalg_el, <- Tvis_bot, em_emb_bot. apply div_set_bot.
+      * rewrite VisLTS.flat_lcoalg_el, <- Tvis_bot_eq, em_emb_bot. apply div_set_bot.
     + rewrite <- (μ_silence_fixed (sil_loop E)). reflexivity.
 Qed.
 
