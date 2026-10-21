@@ -83,7 +83,10 @@ Class DCPO (P : Type) :=
     lce_po :: PartialOrder lce;
     dsup : forall {I} (x : I -> P) `{Hx: !Directed x}, P;
     dsup_is_sup {I} (x : I -> P) `{!Directed x} :: IsSup x (dsup x);
+    dcpo_pointed : Pointed lce;
   }.
+
+Global Existing Instance dcpo_pointed | 10.
 
 Definition lct `{DCPO} x y :=
   lce x y /\ x <> y.
@@ -114,12 +117,15 @@ Qed.
 
 (** *** Least element *)
 
-(** The supremum of the empty family is the least element. *)
-Global Program Instance dcpo_pointed `{DCPO} : Pointed lce | 10 :=
-  {| bot := dsup (Empty_set_rect _) |}.
-Next Obligation.
-  intros. apply sup_lub. tauto.
+(** The least element is the supremum of the empty family. *)
+Lemma bot_dsup_empty `{DCPO} :
+  bot = dsup (Empty_set_rect _).
+Proof.
+  apply antisymmetry; [apply bot_lb | apply sup_lub; tauto].
 Qed.
+
+Global Instance dcpo_ppo `{DCPO} : PPoset P | 10 :=
+  {| pref := lce; pref_po := lce_po; pref_pointed := dcpo_pointed |}.
 
 (** These only use the least element and hold for any pointed order. *)
 
@@ -241,7 +247,11 @@ Section PROD_DCPO.
     {
       lce := lce * lce;
       dsup I x Hx := (dsup (fun i => fst (x i)), dsup (fun i => snd (x i)));
+      dcpo_pointed := {| bot := (bot, bot) |};
     }.
+  Next Obligation.
+    intros. split; apply bot_lb.
+  Qed.
 
 End PROD_DCPO.
 
@@ -292,10 +302,17 @@ Section FORALL_DCPO.
       firstorder.
   Qed.
 
+  Lemma forall_bot_lb (y : forall i, P i) :
+    (forallr - @ i, lce) (fun i => bot) y.
+  Proof.
+    intros i. apply bot_lb.
+  Qed.
+
   Local Instance forall_dcpo : DCPO (forall i, P i) :=
     {
       lce := forallr - @ i, lce;
       dsup J x Hx i := dsup (fun j => x j i);
+      dcpo_pointed := {| bot := fun i => bot; bot_lb := forall_bot_lb |};
     }.
 
 End FORALL_DCPO.
@@ -432,7 +449,7 @@ Global Hint Extern 2 (Directed (fun i => _)) =>
 Lemma sc_bot_lb `{ScottContinuous true} y :
   lce (f bot) y.
 Proof.
-  apply (sc_lub (Empty_set_rect _)). intros [].
+  rewrite bot_dsup_empty. apply (sc_lub (Empty_set_rect _)). intros [].
 Qed.
 
 Lemma sc_bot `{ScottContinuous true} :
@@ -528,6 +545,7 @@ Module FDC.
     {
       lce x y := forall a, is x a -> is y a;
       dsup I x Dx := {| is a := exists i, is (x i) a |};
+      dcpo_pointed := {| bot := {| is a := False |} |};
     }.
   Next Obligation. (* partial order *)
     intros A. split.
@@ -544,6 +562,12 @@ Module FDC.
   Qed.
   Next Obligation. (* dsup is supremum *)
     firstorder.
+  Qed.
+  Next Obligation.
+    intros A a b [].
+  Qed.
+  Next Obligation.
+    intros A y a [].
   Qed.
 
   (** ** Monad stuff / map from Set *)

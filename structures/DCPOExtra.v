@@ -32,6 +32,34 @@ Proof.
   intros I x _ Hx. exists (dsup x). apply dsup_is_sup.
 Qed.
 
+Global Instance dcpo_ppo_dcomplete `{DCPO} : DirectedComplete (R := pref (PPoset := dcpo_ppo)) :=
+  dcpo_dcomplete.
+
+Section DC_DCPO.
+  Context `{PartialOrder} `{!Pointed R} `{!DirectedComplete (R := R)}.
+
+  Definition dc_dsup {I} (x : I -> P) `{!Directed x} : P :=
+    epsilon (inhabits bot) (fun u => IsSup x u).
+
+  Lemma dc_dsup_is_sup {I} (x : I -> P) `{!Directed x} : IsSup x (dc_dsup x).
+  Proof.
+    unfold dc_dsup. apply epsilon_spec.
+    destruct (classic (inhabited I)) as [HI | HI].
+    - exact (dcomplete x HI _).
+    - exists bot. split.
+      + intros i. exfalso. exact (HI (inhabits i)).
+      + intros y _. apply bot_lb.
+  Qed.
+
+  Definition dc_dcpo : DCPO P :=
+    {|
+      lce := R;
+      dsup I x Hx := dc_dsup x;
+      dsup_is_sup I x Hx := dc_dsup_is_sup x;
+      dcpo_pointed := _;
+    |}.
+End DC_DCPO.
+
 (** * Strict maps between DCPOs *)
 
 (** [Strict] is defined over pointed orders in [Posets]; here are the two
@@ -101,7 +129,7 @@ Section LIFT.
   | lift_lce_bot t : lift_lce lift_bot t
   | lift_lce_el x y : R x y -> lift_lce (lift_el x) (lift_el y).
 
-  Global Instance lift_po : PartialOrder lift_lce.
+  Global Instance lift_po : PartialOrder lift_lce | 8.
   Proof.
     split.
     - split.
@@ -110,6 +138,19 @@ Section LIFT.
         transitivity y; assumption.
     - intros t u Htu Hut. inversion Htu; subst; inversion Hut; subst; try reflexivity.
       f_equal. apply antisymmetry; assumption.
+  Qed.
+
+  Global Instance lift_pointed : Pointed lift_lce | 15.
+  Proof.
+    exact {| bot := lift_bot; bot_lb := lift_lce_bot |}.
+  Qed.
+
+  Local Instance lift_ppo : PPoset (lift P R) :=
+    {| pref := lift_lce; pref_po := lift_po; pref_pointed := lift_pointed |}.
+
+  Lemma lift_ppo_bot_eq : bot = (lift_bot : lift P R).
+  Proof.
+    apply antisymmetry; [apply bot_lb | apply lift_lce_bot].
   Qed.
 
   (** *** Directed suprema *)
@@ -156,21 +197,16 @@ Section LIFT.
       + intros y _. constructor.
   Qed.
 
-  Definition lift_dsup {I} (x : I -> lift P R) `{!Directed x} : lift P R :=
-    epsilon (inhabits lift_bot) (fun u => IsSup x u).
-
-  Local Program Instance lift_dcpo : DCPO (lift P R) :=
-    {|
-      lce := lift_lce;
-      dsup := @lift_dsup;
-    |}.
-  Next Obligation.
-    intros. unfold lift_dsup. apply epsilon_spec. apply lift_directed_sup. assumption.
+  Global Instance lift_dcomplete : DirectedComplete (R := lift_lce).
+  Proof.
+    intros I x _ Hx. exact (lift_directed_sup x (Directed0 := Hx)).
   Qed.
+
+  Local Instance lift_dcpo : DCPO (lift P R) := dc_dcpo.
 
   Lemma lift_bot_eq : bot = (lift_bot : lift P R).
   Proof.
-    apply (antisymmetry (R := lce)); [apply bot_lb | apply lift_lce_bot].
+    apply antisymmetry; [apply bot_lb | apply lift_lce_bot].
   Qed.
 
   (** Either no element occurs and the supremum is [bot], or the supremum
@@ -194,6 +230,7 @@ Section LIFT.
 End LIFT.
 
 Global Hint Extern 1 (DCPO (lift _ _)) => simple eapply @lift_dcpo : typeclass_instances.
+Global Hint Extern 15 (PPoset (lift _ _)) => simple eapply @lift_ppo : typeclass_instances.
 
 (** * Kleisli extension *)
 

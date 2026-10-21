@@ -219,3 +219,48 @@ Proof.
   - intros x y Hxy. apply (pc_mon (f := g)), (pc_mon (f := f)), Hxy.
   - unfold Strict. rewrite (strict_bot (f := f)). apply (strict_bot (f := g)).
 Qed.
+
+Class PPoset (P : Type) :=
+  {
+    pref : relation P;
+    pref_po : PartialOrder pref;
+    pref_pointed : Pointed pref;
+  }.
+
+Global Existing Instance pref_po | 5.
+Global Existing Instance pref_pointed | 12.
+
+Module PPoset <: ConcreteCategory.
+
+  Class Structure (P : Type) : Type :=
+    structure_pposet : PPoset P.
+
+  #[global] Typeclasses Transparent Structure.
+
+  Global Hint Immediate structure_pposet : typeclass_instances.
+  Global Hint Extern 1 (Structure _) => red : typeclass_instances.
+
+  Class Morphism {A B} `{Appo: PPoset A} `{Bppo: PPoset B} (f : A -> B) :=
+    morphism_precont : PreContinuous (RA := pref) (RB := pref) f.
+
+  Global Hint Immediate morphism_precont : typeclass_instances.
+  Global Hint Extern 1 (Morphism _) => red : typeclass_instances.
+
+  Global Instance id_mor `{PPoset} :
+    Morphism (fun x => x).
+  Proof.
+    typeclasses eauto.
+  Qed.
+
+  Global Instance compose_mor :
+    forall {A B C} `{PPoset A} `{PPoset B} `{PPoset C} (g: B -> C) (f: A -> B),
+      Morphism g ->
+      Morphism f ->
+      Morphism (fun x => g (f x)).
+  Proof.
+    typeclasses eauto.
+  Qed.
+
+  Include ConcreteCategoryTheory.
+
+End PPoset.

@@ -179,6 +179,7 @@ Lemma kc_bot_lb {K} (inK : inhabited K) {A B} `{DCPO A} `{DCPO B}
     (f : A -> B) `{!KContinuous K f} y :
   lce (f bot) y.
 Proof.
+  rewrite bot_dsup_empty.
   apply (kc_lub (K := K) (Empty_set_rect _) (Kx := Empty_set_kdirected (inK := inK) _)).
   intros [].
 Qed.

@@ -268,10 +268,18 @@ Module FDSL.
       Qed.
     End DSUP.
 
+    Lemma div_lb (y : omap A) : le (eq div) y.
+    Proof.
+      split.
+      - intros a H. discriminate H.
+      - intros σ _. left. reflexivity.
+    Qed.
+
     Global Instance le_dc : DCPO (omap A) :=
       {
         lce := le;
         dsup I x Hx := dsup x;
+        dcpo_pointed := {| bot := eq div; bot_lb := div_lb |};
       }.
   End DCPO.
 

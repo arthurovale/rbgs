@@ -2,7 +2,7 @@ Require Import coqrel.LogicalRelations.
 Require Import interfaces.ConcreteCategory.
 Require Import structures.Posets.
 Require Import structures.DCPOs.
-Require Import structures.SemiLattices.
+Require Export structures.SemiLattices.
 Require Import structures.KDCPOs.
 Require Import structures.DCPOExtra.
 
@@ -358,7 +358,6 @@ Section CONVEX_SETS.
 
 End CONVEX_SETS.
 
-Global Hint Extern 1 (Poset (convex_set _)) => simple eapply @convex_poset : typeclass_instances.
 Global Hint Extern 1 (SemiLattice (convex_set _)) => simple eapply @convex_sl : typeclass_instances.
 
 
@@ -453,7 +452,12 @@ Section EM_ORDER.
   (** The EM order is pointed by [div_set], with no further assumption on [P]. *)
   Global Instance em_pointed : Pointed em_le :=
     {| bot := div_set; bot_lb := div_set_bot |}.
+
+  Local Instance em_ppo : PPoset (convex_set P) :=
+    {| pref := em_le; pref_po := em_le_po; pref_pointed := em_pointed |}.
 End EM_ORDER.
+
+Global Hint Extern 15 (PPoset (convex_set _)) => simple eapply @em_ppo : typeclass_instances.
 
 Section EGLI_MILNER_DOMAIN.
   Context `{DCPO}.
@@ -653,6 +657,7 @@ Section EGLI_MILNER_DOMAIN.
   {|
     lce := em_le;
     dsup := @dsup_em;
+    dcpo_pointed := em_pointed;
   |}.
   Next Obligation.
     split.
@@ -949,6 +954,22 @@ Section EM_EMB_EXT.
       intros [p Hp]. apply Hemb.
   Qed.
 
+  Global Instance em_ext_incl_mon_l {D} `{SemiLattice D} :
+    Monotonic (em_ext (D := D)) ((- ==> ref) ++> (- ==> ref)).
+  Proof.
+    intros f g Hfg. intros x.
+    unfold em_ext. apply sup_lub.
+    intros p. simpl. apply (sup_at p). apply Hfg.
+  Qed.
+
+  Global Instance em_ext_incl_mon_r {D} `{SemiLattice D} (f : P -> D) :
+    Monotonic (em_ext f) (incl ++> ref).
+  Proof.
+    intros x y Hxy. unfold em_ext. apply sup_lub.
+    intros [p Hp]. simpl.  specialize (Hxy p Hp).
+    apply (sup_at (exist _ p Hxy)). reflexivity.
+  Qed.
+
   (** Sup-continuity of the extension only requires [f] to be monotonic
     from the order on [P] to the [lce] order of a DCPOSL. *)
   Global Instance em_ext_sup_cont {D} `{Ddcposl : DCPOSL D} (f : P -> D)
@@ -1047,7 +1068,6 @@ End EM_EMB_POINTED.
 
 Section EM_DOMAIN_FREE.
   Context `{DCPO}.
-
 
   Lemma em_emb_sc {J} (x: J -> P) `{Dx: !Directed x} y : 
     (forall j, em_le {{ x j }} y) -> em_le {{ dsup x }} y.
@@ -1166,6 +1186,7 @@ Section EM_FREE.
       lce_po := em_le_po;
       dsup := @dsup_em P H;
       dsup_is_sup := em_issup;
+      dcpo_pointed := em_pointed;
     |}.
 
   Context (em_kcont : forall K, KContinuous K (lsup (L := convex_set P) (I := K))).
@@ -1417,6 +1438,7 @@ Section EM_RELATIVE_MONAD.
           lce_po := em_le_po;
           dsup := @dsup_em X _;
           dsup_is_sup := em_issup_X;
+          dcpo_pointed := em_pointed;
         |}.
 
       Local Instance em_dcpo_Y : DCPO (convex_set Y) :=
@@ -1425,6 +1447,7 @@ Section EM_RELATIVE_MONAD.
           lce_po := em_le_po;
           dsup := @dsup_em Y _;
           dsup_is_sup := em_issup_Y;
+          dcpo_pointed := em_pointed;
         |}.
 
       Lemma convex_map_kcont : KContinuous K (convex_map f).
@@ -1470,20 +1493,20 @@ Section EM_RELATIVE_MONAD.
       {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}  (g : Y -> convex_set Z) (f : X -> convex_set Y) := 
       f ;; em_ext g.
     
-    Lemma kl_em_compose_id_left {X Y} {Ydcpo : DCPO Y} (f : X -> convex_set Y) :
+    Lemma em_kl_compose_id_left {X Y} {Ydcpo : DCPO Y} (f : X -> convex_set Y) :
       em_kl_compose {{-}} f = f.
     Proof.
       unfold em_kl_compose. rewrite em_monad_lunital. reflexivity.
     Qed.
 
-    Lemma kl_em_compose_id_right {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
+    Lemma em_kl_compose_id_right {X Y} {lceX : relation X} {Xpo : PartialOrder lceX}
       {Ydcpo : DCPO Y} (g : X -> convex_set Y) :
       em_kl_compose g {{-}} = g.
     Proof.
       unfold em_kl_compose. rewrite <- em_monad_runital. reflexivity.
     Qed.
 
-    Lemma kl_em_compose_assoc {X Y Z W} {lceY : relation Y} {Ypo : PartialOrder lceY}
+    Lemma em_kl_compose_assoc {X Y Z W} {lceY : relation Y} {Ypo : PartialOrder lceY}
         {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ} {lceW : relation W} {Wpo : PartialOrder lceW} {Wpt : Pointed lceW}
         (h : Z -> convex_set W) (g : Y -> convex_set Z) (f : X -> convex_set Y)
         {Hh : Monotonic h (lceZ ++> em_le)} :
@@ -1491,5 +1514,40 @@ Section EM_RELATIVE_MONAD.
     Proof.
       unfold em_kl_compose. rewrite em_monad_assoc. reflexivity. assumption.
     Qed.
+
+    Definition em_kl_emb {X Y} {lceY : relation Y} {Ypo : PartialOrder lceY} (f : X -> Y) : X -> convex_set Y :=
+      f ;; {{-}}.
+
+    Lemma em_kl_compose_emb_l {X Y Z} {lceY: relation Y} {Ypo : PartialOrder lceY}
+      {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}  
+        (f : X -> Y) (α : Y -> convex_set Z) : em_kl_compose α (em_kl_emb f) = f ;; α.
+    Proof.
+      apply functional_extensionality. intros x. apply em_ext_ana.
+    Qed.
+
+    Lemma em_kl_compose_emb_r  {X Y Z} {lceY: relation Y} {Ypo : PartialOrder lceY}
+      {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}  
+        (α : X -> convex_set Y) (f : Y -> Z)  : em_kl_compose (em_kl_emb f) α = α ;; convex_map f.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma em_kl_emb_id {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
+      em_kl_emb (id : X -> X) = {{-}}.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma em_kl_emb_compose {X Y Z} {lceY : relation Y} {Ypo : PartialOrder lceY}
+        {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}
+        (g : Y -> Z) (f : X -> Y) :
+      em_kl_emb (f ;; g) = em_kl_compose (em_kl_emb g) (em_kl_emb f).
+    Proof.
+      apply functional_extensionality. intros x. unfold em_kl_compose, em_kl_emb.
+      rewrite em_ext_ana. reflexivity.
+    Qed.
   End EM_KLEISLI.
 End EM_RELATIVE_MONAD.
+
+Notation "{{ e ; x ∈ S }}" := (convex_map (fun x => e) S)
+  (at level 0, x ident, e at level 99, S at level 99, format "{{ e ; x ∈ S }}").

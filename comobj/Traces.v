@@ -1,9 +1,9 @@
 Require Import comobj.SilLTS.
 Require Import comobj.VisLTS.
-
 Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
+Require Import structures.DCPOSLs.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
@@ -256,6 +256,7 @@ Local Instance Tr_dcpo E : DCPO (Tr E) :=
     lce := Tr_lce;
     dsup I x Hx := Tr_dsup x;
     dsup_is_sup I x Hx := Tr_dsup_is_sup x;
+    dcpo_pointed := Tr_pointed E;
   }.
 
 Global Hint Extern 1 (DCPO (Tr _)) => simple eapply @Tr_dcpo : typeclass_instances.
@@ -354,3 +355,49 @@ Proof.
   intros. apply functional_extensionality. intros. 
   apply Tr_bisim_eq. apply Tr_ana_bisim. assumption.
 Qed.
+
+(** ** Exchange Law *)
+
+Section EXCHANGE_LAW.
+  Definition λ_Tvis {E S} `{PPoset S} (a : Tvis E (convex_set S)) : convex_set (Tvis E S) :=
+    match a with
+    | ↺ => {{↺}}
+    | -e-> ts => {{ -e-> t ; t ∈ ts }}
+    end.
+
+  (* Properties *)
+End EXCHANGE_LAW.
+
+Section TRACES.
+  Context {E S : Type} `{PPoset S}.
+
+  Definition convex_Tvis {S'} `{PPoset S'}
+    (f : S -> convex_set S') : Tvis E S -> convex_set (Tvis E S') :=
+    Tvis_map id f ;; λ_Tvis.
+
+  Local Notation "f ⊙ g" := (em_kl_compose g f) (at level 60, right associativity).
+
+  (* properties, such as functoriality *)
+
+  Definition Φ_traces (α : S -> convex_set (Tvis E S))
+    (g : S -> convex_set (Tr E)) : S -> convex_set (Tr E) :=
+    α ⊙ convex_Tvis (S' := Tr E) g ⊙ em_kl_emb Tr_fold.
+
+  Global Instance convex_Tvis_incl_mon {S'} `{PPoset S'} :
+    Monotonic (convex_Tvis (S' := S')) ((- ==> ref) ++> (- ==> ref)).
+  Proof.
+    intros f g Hfg s. 
+    destruct s as [| s]; unfold convex_Tvis; cbn [Tvis_map λ_Tvis compose].
+    - reflexivity.
+    - destruct s as [e s]. apply em_ext_incl_mon_r. apply Hfg.
+  Qed.
+
+  Global Instance Φ_traces_incl_mon (α : S -> convex_set (Tvis E S)) :
+    Monotonic (Φ_traces α) ((- ==> ref) ++> (- ==> ref)).
+  Proof.
+    intros g g' Hg s. unfold Φ_traces, em_kl_compose.
+    apply (em_ext_incl_mon_l (P := Tvis E S)). intros t.
+    apply em_ext_incl_mon_r. apply convex_Tvis_incl_mon. exact Hg.
+  Qed.
+
+End TRACES.
