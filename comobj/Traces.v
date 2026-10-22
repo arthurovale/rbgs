@@ -1,9 +1,11 @@
-Require Import comobj.SilLTS.
-Require Import comobj.VisLTS.
 Require Import structures.Posets.
+Require Import structures.SemiLattices.
 Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
 Require Import structures.DCPOSLs.
+
+Require Import comobj.SilLTS.
+Require Import comobj.VisLTS.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
@@ -400,4 +402,8 @@ Section TRACES.
     apply em_ext_incl_mon_r. apply convex_Tvis_incl_mon. exact Hg.
   Qed.
 
+  Definition traces_at (α : S -> convex_set (Tvis E S)) := KTFP.gfp (Φ_traces α).
+
+  Definition traces (α : VisLTS E S) : convex_set (Tr E) := 
+    em_ext (traces_at α) (VisLTS.init α).
 End TRACES.

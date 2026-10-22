@@ -51,5 +51,6 @@ comobj/Sig.v
 comobj/LCoalg.v
 comobj/SilLTS.v
 comobj/VisLTS.v
+comobj/Traces.v
 
 structures/TypeclassProbes.v

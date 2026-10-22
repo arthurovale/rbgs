@@ -1,10 +1,12 @@
 Require Import coqrel.LogicalRelations.
+
 Require Import interfaces.ConcreteCategory.
-Require Import structures.Posets.
-Require Import structures.DCPOs.
+
+Require Export structures.Posets.
+Require Export structures.DCPOs.
 Require Export structures.SemiLattices.
-Require Import structures.KDCPOs.
-Require Import structures.DCPOExtra.
+Require Export structures.KDCPOs.
+Require Export structures.DCPOExtra.
 
 Require Import Stdlib.Program.Program.
 Require Import Stdlib.Logic.PropExtensionality.
@@ -95,35 +97,7 @@ Qed.
 Section FORALL_DCPOSL.
   Context {I} {L : I -> Type} `{Ldcposl : forall i : I, DCPOSL (L i)}.
 
-  Local Instance forall_ref_po :
-    @PartialOrder (forall i, L i) (forallr - @ i, ref).
-  Proof.
-    split.
-    - split.
-      + intros x i. reflexivity.
-      + intros x y z Hxy Hyz i. etransitivity; eauto.
-    - intros x y Hxy Hyx.
-      apply functional_extensionality_dep. intros i.
-      apply (antisymmetry (R := ref)); [apply Hxy | apply Hyx].
-  Qed.
-
-  Local Instance forall_poset : Poset (forall i, L i) :=
-    {
-      ref := forallr - @ i, ref;
-    }.
-
   Local Obligation Tactic := idtac.
-
-  Local Program Instance forall_sl : SemiLattice (forall i, L i) :=
-    {
-      cdl_poset := forall_poset;
-      lsup J x := fun i => lsup (fun j => x j i);
-    }.
-  Next Obligation.
-    intros J u. split.
-    - intros j i. apply (sup_ub (IsSup := lsup_sup (fun j => u j i)) j).
-    - intros y Hy i. apply (sup_lub (IsSup := lsup_sup (fun j => u j i))). intros j. apply (Hy j i).
-  Qed.
 
   (** Projecting a family of functions at a point preserves directedness. *)
 
@@ -162,8 +136,6 @@ Section FORALL_DCPOSL.
   Qed.
 End FORALL_DCPOSL.
 
-Global Hint Extern 1 (SemiLattice (forall i, _)) =>
-  lazymatch goal with |- SemiLattice (forall _, _) => eapply @forall_sl end : typeclass_instances.
 Global Hint Extern 1 (DCPOSL (forall i, _)) =>
   lazymatch goal with |- DCPOSL (forall _, _) => eapply @forall_dcposl end : typeclass_instances.
 

@@ -347,7 +347,7 @@ Qed.
 (** First, we define a functional operator that filters a visible step.
   On a visible transition, it simply uses the singleton map, while on a silent
   transition it iterates the candidate. *)
-Section SILENCE.
+Section LOUDEN.
   Context {E S : Type} `{Sdcpo : DCPO S} `{!Finitary (R := lce (P := S))}.
 
   Definition vstep (g : VisLTS E S) : Tsil E S -> convex_set (Tvis E S) :=
@@ -398,7 +398,7 @@ Section SILENCE.
 
   To be able to compute its fixpoint, we show it is pre-continuous.
   *)
-  Lemma Φ_silence_trans_pc (α : SilLTS E S) (g : VisLTS E S) :
+  Lemma Φ_louden_trans_pc (α : SilLTS E S) (g : VisLTS E S) :
     PreContinuous (RA := pref) (RB := em_le) (α ;; em_ext (vstep g)).
   Proof.
     split.
@@ -409,41 +409,41 @@ Section SILENCE.
   Qed.
 
   (** The functional proper is defined on coalgebras directly. *)
-  Definition Φ_silence (α : SilLTS E S) (g : VisLTS E S) : VisLTS E S :=
+  Definition Φ_louden (α : SilLTS E S) (g : VisLTS E S) : VisLTS E S :=
     {|
       VisLTS.trans := α ;; em_ext (vstep g);
       VisLTS.init := SilLTS.init α;
-      VisLTS.trans_pc := Φ_silence_trans_pc α g;
+      VisLTS.trans_pc := Φ_louden_trans_pc α g;
     |}.
 
-  Lemma Φ_silence_mon (α : SilLTS E S) :
-    Monotonic (Φ_silence α) (lce ++> lce).
+  Lemma Φ_louden_mon (α : SilLTS E S) :
+    Monotonic (Φ_louden α) (lce ++> lce).
   Proof.
     intros g g' Hg. split.
-    - intros s. unfold Φ_silence. cbn [VisLTS.trans]. unfold em_ext.
+    - intros s. unfold Φ_louden. cbn [VisLTS.trans]. unfold em_ext.
       apply (lsup_mon (H := em_dcposl (P := Tvis E S))).
       intros [p Hp]. apply vstep_mono_l. exact Hg.
     - reflexivity.
   Qed.
 
-  (** [Φ_silence α] is monotonic but not Scott-continuous for arbitrary
+  (** [Φ_louden α] is monotonic but not Scott-continuous for arbitrary
     directed families when [S] has infinite silent branching, so the least
     fixpoint is taken by transfinite iteration. *)
-  Definition silence (α : SilLTS E S) : VisLTS E S :=
-    TFP.lfp (Φ_silence α) (Hf := Φ_silence_mon α).
+  Definition louden (α : SilLTS E S) : VisLTS E S :=
+    TFP.lfp (Φ_louden α) (Hf := Φ_louden_mon α).
 
-  Lemma μ_silence_fixed (α : SilLTS E S) :
-    Φ_silence α (silence α) = silence α.
+  Lemma μ_louden_fixed (α : SilLTS E S) :
+    Φ_louden α (louden α) = louden α.
   Proof.
     apply TFP.lfp_fixed.
   Qed.
 
   (** ** Basic Facts *)
 
-  Lemma silence_init (α : SilLTS E S) :
-    VisLTS.init (silence α) = SilLTS.init α.
+  Lemma louden_init (α : SilLTS E S) :
+    VisLTS.init (louden α) = SilLTS.init α.
   Proof.
-    rewrite <- μ_silence_fixed. reflexivity.
+    rewrite <- μ_louden_fixed. reflexivity.
   Qed.
 
   (** Silencing a loud communicating object does nothing *)
@@ -467,29 +467,29 @@ Section SILENCE.
     destruct t as [| [e c]]; reflexivity.
   Qed.
 
-  Lemma cant_silence_loud (α : SilLTS E S) (α_vis : VisLTS E S) : loud α α_vis -> silence α = α_vis.
+  Lemma louden_loud (α : SilLTS E S) (α_vis : VisLTS E S) : loud α α_vis -> louden α = α_vis.
   Proof.
-    intros [H Hi]. rewrite <- (μ_silence_fixed α). apply VisLTS.lcoalg_ext.
-    - apply functional_extensionality. intros s. unfold Φ_silence. cbn [VisLTS.trans].
+    intros [H Hi]. rewrite <- (μ_louden_fixed α). apply VisLTS.lcoalg_ext.
+    - apply functional_extensionality. intros s. unfold Φ_louden. cbn [VisLTS.trans].
       rewrite <- H. lazy beta. apply em_ext_vstep_loud.
     - symmetry. exact Hi.
   Qed.
 
-  (** A corollary is that [silence] is idempotent *)
+  (** A corollary is that [louden] is idempotent *)
 
-  Lemma silence_idem (α : SilLTS E S) : silence (VisLTS_to_SilLTS (silence α)) = silence α.
+  Lemma louden_idem (α : SilLTS E S) : louden (VisLTS_to_SilLTS (louden α)) = louden α.
   Proof.
-    apply cant_silence_loud. apply VisLTS_to_SilLTS_loud.
+    apply louden_loud. apply VisLTS_to_SilLTS_loud.
   Qed.
-End SILENCE.
+End LOUDEN.
 
 (** ** Sanity Check: silencing a silent loop yields divergence *)
 
-Lemma silence_sil_loop_div {E} : silence (sil_loop E) = vis_div.
+Lemma louden_sil_loop_div {E} : louden (sil_loop E) = vis_div.
 Proof.
   apply antisymmetry.
   - apply TFP.lfp_least_prefixed. split.
-    + intros [| []]; unfold Φ_silence, sil_loop, vis_div; cbn [VisLTS.trans].
+    + intros [| []]; unfold Φ_louden, sil_loop, vis_div; cbn [VisLTS.trans].
       * rewrite !SilLTS.flat_lcoalg_bot, em_ext_bot. erewrite vstep_div; [apply div_set_bot |].
         apply lift_ppo_bot_eq.
       * rewrite !SilLTS.flat_lcoalg_el, em_ext_ana. reflexivity.
@@ -498,5 +498,5 @@ Proof.
     + intros [| []]; unfold vis_div.
       * rewrite VisLTS.flat_lcoalg_bot. apply bot_lb.
       * rewrite VisLTS.flat_lcoalg_el, <- Tvis_bot_eq, em_emb_bot. apply div_set_bot.
-    + rewrite <- (μ_silence_fixed (sil_loop E)). reflexivity.
+    + rewrite <- (μ_louden_fixed (sil_loop E)). reflexivity.
 Qed.

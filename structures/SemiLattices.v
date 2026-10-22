@@ -1,5 +1,10 @@
 Require Export structures.Posets.
+
 Require Import interfaces.ConcreteCategory.
+
+Require Import Stdlib.Program.Program.
+Require Import Stdlib.Logic.FunctionalExtensionality.
+
 
 (* NOTE: This was created by first taking Jérémie's CDLattices and then 
 removing all the data about infs. *)
@@ -213,6 +218,43 @@ Proof.
   apply lbot_lb.
 Qed.
 
+Section FORALL_SL.
+  Context {I} {L : I -> Type} `{Lsl : forall i : I, SemiLattice (L i)}.
+
+  Local Instance forall_ref_po :
+    @PartialOrder (forall i, L i) (forallr - @ i, ref).
+  Proof.
+    split.
+    - split.
+      + intros x i. reflexivity.
+      + intros x y z Hxy Hyz i. etransitivity; eauto.
+    - intros x y Hxy Hyx.
+      apply functional_extensionality_dep. intros i.
+      apply (antisymmetry (R := ref)); [apply Hxy | apply Hyx].
+  Qed.
+
+  Local Instance forall_poset : Poset (forall i, L i) :=
+    {
+      ref := forallr - @ i, ref;
+    }.
+
+  Local Obligation Tactic := idtac.
+
+  Local Program Instance forall_sl : SemiLattice (forall i, L i) :=
+    {
+      cdl_poset := forall_poset;
+      lsup J x := fun i => lsup (fun j => x j i);
+    }.
+  Next Obligation.
+    intros J u. split.
+    - intros j i. apply (sup_ub (IsSup := lsup_sup (fun j => u j i)) j).
+    - intros y Hy i. apply (sup_lub (IsSup := lsup_sup (fun j => u j i))). intros j. apply (Hy j i).
+  Qed.
+End FORALL_SL.
+
+Global Hint Extern 1 (SemiLattice (forall i, _)) =>
+  lazymatch goal with |- SemiLattice (forall _, _) => eapply @forall_sl end : typeclass_instances.
+
 Module SLat <: ConcreteCategory.
 
   Class Structure (L : Type) : Type :=
@@ -245,3 +287,43 @@ Module SLat <: ConcreteCategory.
   Include ConcreteCategoryTheory.
 
 End SLat.
+
+Module KTFP.
+  Section KTFP.
+    Context {L : Type} `{Lsl : SemiLattice L} 
+            (f : L -> L) `{Hf: Monotonic f (ref ++> ref)}.
+
+    Definition candidate x := x <= f x.
+
+    Lemma candidate_apply x : candidate x -> candidate (f x).
+    Proof.
+      intros. monotonicity. assumption.
+    Qed.
+    
+    Definition Candidate := {x | candidate x}.
+
+    Definition gfp := lsup (fun c : Candidate  => `c).
+
+    Lemma gfp_fixed : f gfp = gfp.
+    Proof.
+      assert (H: forall c : Candidate, `c <= f gfp).
+      {
+        intros c. destruct c as [l Hl] eqn:Hc. simpl. transitivity (f l). assumption.
+        monotonicity. apply (sup_at c). subst. reflexivity.
+      }
+      assert (Hgfp: gfp <= f gfp).
+      {
+        eapply sup_lub. apply H.
+      }
+      apply antisymmetry; [| assumption].
+      apply candidate_apply in Hgfp.
+      apply (sup_at (exist _ (f gfp) Hgfp)). reflexivity.
+    Qed.
+
+    Lemma gfp_coind x :
+      x <= f x -> x <= gfp.
+    Proof.
+      intros. apply (sup_at (exist _ x H)). reflexivity.
+    Qed.
+  End KTFP.
+End KTFP.
