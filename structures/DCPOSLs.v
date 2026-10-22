@@ -241,9 +241,6 @@ Section CONVEX_SETS.
     ref := incl;
   }.
 
-  (** Joins are given by convex unions, so first we define the usual union *)
-  Definition union {I} (x : I -> (P -> Prop)) (a : P) := exists i, x i a.
-
   (** **** Convex Hull *)
 
   (** A key operation for the EM powerdomain is the convex hull operation. *)

@@ -19,7 +19,7 @@ Require Import comobj.LCoalg.
 Require Import comobj.SilLTS.
 
 
-(** * The Silencing Operator *)
+(** * The Loudening Operator *)
 
 Open Scope tsil_scope.
 
@@ -338,7 +338,7 @@ Proof.
   apply (loud_unique (VisLTS_to_SilLTS_loud α) Lβ). exact (f_equal SilLTS.init H).
 Qed.
 
-(** ** The Silencing Operator *)
+(** ** The Loudening Operator *)
 
 (** We now define an operation that acts like Milner saturation, removing silent steps.
   However, unlike the milner star, it does so why computing infinite sequences of
@@ -483,7 +483,7 @@ Section LOUDEN.
   Qed.
 End LOUDEN.
 
-(** ** Sanity Check: silencing a silent loop yields divergence *)
+(** ** Sanity Check: loudening a silent loop yields divergence *)
 
 Lemma louden_sil_loop_div {E} : louden (sil_loop E) = vis_div.
 Proof.
