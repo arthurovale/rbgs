@@ -358,52 +358,77 @@ Proof.
   apply Tr_bisim_eq. apply Tr_ana_bisim. assumption.
 Qed.
 
-(** ** Exchange Law *)
+(** ** Traces Map *)
 
 Section EXCHANGE_LAW.
-  Definition λ_Tvis {E S} `{PPoset S} (a : Tvis E (convex_set S)) : convex_set (Tvis E S) :=
+  Context {E : Type}.
+  Local Open Scope set_scope.
+
+  Definition λ_Tvis_set {S} `{PPoset S} (a : Tvis E (set S)) : set (Tvis E S) :=
     match a with
     | ↺ => {{↺}}
     | -e-> ts => {{ -e-> t ; t ∈ ts }}
     end.
 
-  (* Properties *)
+  Lemma λ_Tvis_set_mon {S} `{PPoset S} (e : E) (ts ts' : set S) :
+    ts ⊆ ts' -> λ_Tvis_set (-e-> ts) ⊆ λ_Tvis_set (-e-> ts').
+  Proof.
+    intros Hts. cbn [λ_Tvis_set]. apply set_map_mon. exact Hts.
+  Qed.
+
+  Lemma λ_Tvis_set_emb {S} `{PPoset S} :
+    Tvis_map id {{-}} ;; λ_Tvis_set = {{-}} :> (Tvis E S -> set (Tvis E S)).
+  Admitted.
+
+  Lemma λ_Tvis_set_ext {S S'} `{PPoset S} `{PPoset S'} (f : S -> set S') :
+    Tvis_map id (set_ext f) ;; λ_Tvis_set = λ_Tvis_set ;; set_ext (Tvis_map id f ;; λ_Tvis_set).
+  Admitted.
+
+  Lemma λ_Tvis_nat {S S'} `{PPoset S} `{PPoset S'} (h : S -> S') :
+    Tvis_map id (set_map h) ;; λ_Tvis_set = λ_Tvis_set ;; set_map (Tvis_map id h).
+  Admitted.
 End EXCHANGE_LAW.
 
 Section TRACES.
   Context {E S : Type} `{PPoset S}.
+  Local Open Scope set_scope.
 
-  Definition convex_Tvis {S'} `{PPoset S'}
-    (f : S -> convex_set S') : Tvis E S -> convex_set (Tvis E S') :=
-    Tvis_map id f ;; λ_Tvis.
+  Definition set_Tvis {S'} `{PPoset S'} (f : S -> set S') (t : Tvis E S) : set (Tvis E S') :=
+    match t with
+    | ↺ => {{↺}}
+    | -e-> s => {{ -e-> s' ; s' ∈ f s }}
+    end.
 
-  Local Notation "f ⊙ g" := (em_kl_compose g f) (at level 60, right associativity).
-
-  (* properties, such as functoriality *)
-
-  Definition Φ_traces (α : S -> convex_set (Tvis E S))
-    (g : S -> convex_set (Tr E)) : S -> convex_set (Tr E) :=
-    α ⊙ convex_Tvis (S' := Tr E) g ⊙ em_kl_emb Tr_fold.
-
-  Global Instance convex_Tvis_incl_mon {S'} `{PPoset S'} :
-    Monotonic (convex_Tvis (S' := S')) ((- ==> ref) ++> (- ==> ref)).
+  Lemma set_Tvis_eq {S'} `{PPoset S'} (f : S -> set S') :
+    set_Tvis f = Tvis_map id f ;; λ_Tvis_set.
   Proof.
-    intros f g Hfg s. 
-    destruct s as [| s]; unfold convex_Tvis; cbn [Tvis_map λ_Tvis compose].
-    - reflexivity.
-    - destruct s as [e s]. apply em_ext_incl_mon_r. apply Hfg.
+    apply functional_extensionality. intros [| [e s]]; reflexivity.
   Qed.
 
-  Global Instance Φ_traces_incl_mon (α : S -> convex_set (Tvis E S)) :
+  Local Notation "f ⊙ g" := (set_kl_compose g f) (at level 60, right associativity).
+
+  Definition Φ_traces (α : S -> convex_set (Tvis E S))
+    (g : S -> set (Tr E)) : S -> set (Tr E) :=
+      α ⊙ set_Tvis g ⊙ set_kl_emb Tr_fold.
+
+  Global Instance set_Tvis_mon {S'} `{PPoset S'} :
+    Monotonic (set_Tvis (S' := S')) ((- ==> ref) ++> (- ==> ref)).
+  Proof.
+    intros f g Hfg [| [e s]]; cbn [set_Tvis].
+    - reflexivity.
+    - apply set_map_mon. apply Hfg.
+  Qed.
+
+  Global Instance Φ_traces_mon (α : S -> convex_set (Tvis E S)) :
     Monotonic (Φ_traces α) ((- ==> ref) ++> (- ==> ref)).
   Proof.
-    intros g g' Hg s. unfold Φ_traces, em_kl_compose.
+    intros g g' Hg s. unfold Φ_traces, set_kl_compose.
     apply (em_ext_incl_mon_l (P := Tvis E S)). intros t.
-    apply em_ext_incl_mon_r. apply convex_Tvis_incl_mon. exact Hg.
+    apply set_ext_mon_r. apply set_Tvis_mon. exact Hg.
   Qed.
 
   Definition traces_at (α : S -> convex_set (Tvis E S)) := KTFP.gfp (Φ_traces α).
 
-  Definition traces (α : VisLTS E S) : convex_set (Tr E) := 
+  Definition traces (α : VisLTS E S) : set (Tr E) :=
     em_ext (traces_at α) (VisLTS.init α).
 End TRACES.

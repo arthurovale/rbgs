@@ -7,6 +7,7 @@ Require Import comobj.Traces.
 Section REFINES.
   Context {E Sα : Type}
     `{DCPO Sα} `{!Finitary (R := lce (P := Sα))}.
+  Local Open Scope set_scope.
 
   Section DEF.
     Context {Sβ : Type}

@@ -4,7 +4,8 @@ Require Import interfaces.ConcreteCategory.
 
 Require Import Stdlib.Program.Program.
 Require Import Stdlib.Logic.FunctionalExtensionality.
-
+Require Import Stdlib.Logic.PropExtensionality.
+Require Import Stdlib.Lists.List.
 
 (* NOTE: This was created by first taking Jérémie's CDLattices and then 
 removing all the data about infs. *)
@@ -80,6 +81,11 @@ Section OPS.
   Proof.
     apply sup_lub. intros [ ].
   Qed.
+
+  (** The join order of a semilattice is pointed by [lbot]. It gets a low
+    priority so that an unannotated [bot] on a DCPOSL means the [lce] bottom. *)
+  Global Instance sl_pointed : Pointed ref | 20 :=
+    {| bot := lbot; bot_lb := lbot_lb |}.
 
   (** ** Binary joins *)
 
@@ -288,6 +294,302 @@ Module SLat <: ConcreteCategory.
 
 End SLat.
 
+(** ** Free Join-Semilattice *)
+
+Section FREE_SL.
+  Definition set (P : Type) := P -> Prop.
+
+  Lemma set_eq {P} (x y : set P) :
+    (forall p, x p <-> y p) -> x = y.
+  Proof.
+    intros. apply functional_extensionality. intros p.
+    apply propositional_extensionality. apply H.
+  Qed.
+
+  Definition subset {P} (x : set P) (y : set P) : Prop :=
+    forall p, x p -> y p.
+
+  Global Instance subset_po {P} : PartialOrder (subset (P := P)).
+  Proof.
+    split. split; firstorder.
+    intros x y incl_x_y incl_y_x.
+    apply functional_extensionality. intro z.
+    apply propositional_extensionality.
+    split; [apply incl_x_y | apply incl_y_x].
+  Qed.
+
+  Local Instance set_poset {P} : Poset (set P) :=
+  {
+    ref := subset;
+  }.
+
+  (** Joins are given by convex unions, so first we define the usual union *)
+  Definition union {P} {I} (x : I -> (P -> Prop)) (a : P) := exists i, x i a.
+
+  Local Program Instance set_sl {P} : SemiLattice (set P) :=
+    {
+      lsup I x := union x;
+    }.
+  Next Obligation.
+    split.
+    - intros i. intros p H. exists i; assumption.
+    - intros x H. intros p [j Hu]. exact (H j p Hu).
+  Qed.
+
+  Local Instance set_ppo {P} : PPoset (set P) :=
+    {| pref := subset; pref_po := subset_po;
+       pref_pointed := @sl_pointed (set P) (@set_sl P) |}.
+
+  Definition set_emb {P} (p : P) : set P := fun p' => p' = p.
+
+  Definition set_ext {P D} `{SemiLattice D} (f : P -> D) (x : set P) : D :=
+    lsup (fun p : {p : P | x p} => f (`p)).
+
+  Lemma set_ext_ana {P D} `{SemiLattice D} (f : P -> D) :
+    forall p, set_ext f (set_emb p) = f p.
+  Proof.
+    intros p. unfold set_emb, set_ext. simpl.
+    apply antisymmetry.
+    - apply sup_lub. intros i. destruct i. subst. reflexivity.
+    - exact (sup_ub (exist (fun q => q = p) p eq_refl)).
+  Qed.
+    
+  Lemma set_emb_join_eq {P} (x : set P) :
+    lsup (fun p : {p : P | x p} => set_emb (`p)) = x.
+  Proof.
+    apply antisymmetry.
+    - intros p Hsup. destruct Hsup as [[p' Hx]  Hemb].
+      unfold set_emb in Hemb. simpl in Hemb. subst. assumption.
+    - intros p xp. exists (exist _ p xp). reflexivity.
+  Qed.
+
+  Lemma set_ext_unique {P D} `{SemiLattice D} (f : P -> D)
+      (g : set P -> D) `{!SupContinuous g} :
+    (forall p, g (set_emb p) = f p) -> forall x, g x = set_ext f x.
+  Proof.
+    intros Hemb x.
+    transitivity (g (lsup (fun p : {p : P | x p} => set_emb (`p)))).
+    - f_equal. symmetry. apply set_emb_join_eq.
+    - rewrite sup_cont. unfold set_ext. f_equal.
+      apply functional_extensionality.
+      intros [p Hp]. apply Hemb.
+  Qed.
+
+  Global Instance set_ext_mon_l {P D} `{SemiLattice D} :
+    Monotonic (set_ext (P := P) (D := D)) ((- ==> ref) ++> (- ==> ref)).
+  Proof.
+    intros f g Hfg. intros x. unfold set_ext.
+    apply sup_lub. intros p. apply (sup_at p). apply Hfg.
+  Qed.
+
+  Global Instance set_ext_mon_r {P D} `{SemiLattice D} (f : P -> D) :
+    Monotonic (set_ext f) (subset ++> ref).
+  Proof.
+    intros x y Hxy. unfold set_ext. apply sup_lub.
+    intros [p Hp]. simpl.  specialize (Hxy p Hp).
+    apply (sup_at (exist _ p Hxy)). reflexivity.
+  Qed.
+
+  Global Instance set_ext_sup_cont {P D} `{SemiLattice D} (f : P -> D) :
+    SupContinuous (set_ext f).
+  Proof.
+    split.
+    intros I x. unfold set_ext. simpl. apply antisymmetry.
+    - apply sup_lub. intros p. destruct p as [p [i Hx]]. simpl.
+      apply (sup_at i). apply (sup_at (exist _ p Hx)). reflexivity.
+    - apply sup_lub. intros i. apply sup_lub. intros [p Hx].
+      assert (Hu: union x p). { exists i; exact Hx. }
+      apply (sup_at (exist _ p Hu)). reflexivity.
+  Qed.
+
+  Lemma set_ext_lbot {P D} `{SemiLattice D} (f : P -> D) :
+    set_ext f lbot = lbot.
+  Proof.
+    apply supcont_strict. typeclasses eauto.
+  Qed.
+
+  Lemma set_in_iff {P} (p : P) (x : set P) :
+    subset (set_emb p) x <-> x p.
+  Proof.
+    split.
+    - intros H. exact (H p eq_refl).
+    - intros Hx. unfold subset. intros p'. intros Hemb.
+      destruct Hemb. assumption.
+  Qed.
+
+  Definition set_fin {P} (l : list P) : set P :=
+    fsup (fun p => In p l) set_emb.
+
+  Lemma set_comp_in {P} (x : P -> Prop) (p : P) :
+    x p -> fsup x set_emb p.
+  Proof.
+    intros Hx. simpl. exists (exist _ p Hx). reflexivity.
+  Qed.
+
+  Lemma set_fin_in {P} (l : list P) (p : P) :
+    In p l -> set_fin l p.
+  Proof.
+    intros Hin. unfold set_fin.
+    simpl. exists (exist _ p Hin). reflexivity.
+  Qed.
+
+End FREE_SL.
+
+Global Hint Extern 1 (SemiLattice (set _)) => simple eapply @set_sl : typeclass_instances.
+Global Hint Extern 15 (PPoset (set _)) => simple eapply @set_ppo : typeclass_instances.
+
+Declare Scope set_scope.
+Delimit Scope set_scope with set.
+
+Notation "{{-}}" := set_emb : set_scope.
+Notation "{{ x }}" := (set_emb x) (at level 0, x at level 99, format "{{ x }}") : set_scope.
+Notation "x ⊆ y" := (subset x y) (at level 70, no associativity) : set_scope.
+Notation "x ∈ S" := (S x) (at level 70, no associativity, only parsing) : set_scope.
+Notation "{{ x , y , .. , z }}" := (set_fin (cons x (cons y .. (cons z nil) ..)))
+  (at level 0, format "{{ x , y , .. , z }}") : set_scope.
+Notation "{{ x | P }}" := (fsup (fun x => P) set_emb)
+  (at level 0, x at level 99, format "{{ x | P }}") : set_scope.
+
+Section SET_MONAD.
+  Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
+  Local Abbreviation id := (fun x => x).
+
+  Lemma set_monad_runital {X Y} (f : X -> set Y) :
+    f = set_emb ;; set_ext f.
+  Proof.
+    apply functional_extensionality. intros x. unfold set_ext, set_emb.
+    apply set_eq. intros y. split.
+    - intros Hxy. exists (exist (fun p => p = x) x eq_refl). assumption.
+    - intros [[x' Hx] Hf]. subst. assumption.
+  Qed.
+
+  Lemma set_monad_lunital {P} :
+    set_ext (set_emb (P := P)) = id.
+  Proof.
+    apply functional_extensionality. intros x. unfold set_ext, set_emb.
+    apply set_eq. intros p. split.
+    - simpl. intros [[p' Hx] Heq]. simpl in Heq. subst. assumption.
+    - intros Hx. exists (exist _ p Hx). reflexivity.
+  Qed.
+
+  Lemma set_monad_assoc {X Y Z} (g : Y -> set Z) (f : X -> set Y) :
+    set_ext (f ;; set_ext g) = set_ext f ;; set_ext g.
+  Proof.
+    apply functional_extensionality. intros x. symmetry.
+    apply (set_ext_unique (f ;; set_ext g) (set_ext f ;; set_ext g)).
+    intros p. exact (f_equal (set_ext g) (set_ext_ana f p)).
+  Qed.
+
+  Definition set_map {X Y} (f : X -> Y) : set X -> set Y :=
+    set_ext (f ;; set_emb).
+
+  Lemma set_map_id {X} :
+    set_map (id : X -> X) = id.
+  Proof.
+    unfold set_map. rewrite set_monad_lunital. reflexivity.
+  Qed.
+
+  Lemma set_map_compose {X Y Z} (g : Y -> Z) (f : X -> Y) :
+    set_map (f ;; g) = set_map f ;; set_map g.
+  Proof.
+    unfold set_map.
+    rewrite <- (set_monad_assoc (g ;; set_emb) (f ;; set_emb)).
+    apply f_equal. 
+    change (f ;; (g ;; set_emb) = f ;; (set_emb ;; set_ext (g ;; set_emb))).
+    rewrite <- (set_monad_runital (g ;; set_emb)). reflexivity.
+  Qed.
+
+  Lemma set_map_mon {X Y} (f : X -> Y) :
+    Monotonic (set_map f) (subset ++> subset).
+  Proof.
+    unfold set_map. exact (set_ext_mon_r (f ;; set_emb)).
+  Qed.
+
+  Global Instance set_map_sup_cont {X Y} (f : X -> Y) :
+    SupContinuous (set_map f).
+  Proof.
+    unfold set_map. exact (set_ext_sup_cont (f ;; set_emb)).
+  Qed.
+
+  Lemma set_emb_nat {X Y} (f : X -> set Y) :
+    set_emb ;; set_map f = f ;; set_emb.
+  Proof.
+    unfold set_map. rewrite <- (set_monad_runital (f ;; set_emb)). reflexivity.
+  Qed.
+
+  Lemma set_ext_nat_src {X Y Z} (f : X -> set Z) (g : Y -> X) :
+    set_ext (g ;; f) = set_map g ;; set_ext f.
+  Proof.
+    unfold set_map.
+    rewrite <- (set_monad_assoc f (g ;; set_emb)).
+    apply f_equal.
+    change (g ;; f = g ;; (set_emb ;; set_ext f)).
+    rewrite <- (set_monad_runital f). reflexivity.
+  Qed.
+
+  Lemma set_ext_nat_tgt {X Y Y'} (f : X -> set Y) (h : Y -> Y') :
+    set_ext (f ;; set_map h) = set_ext f ;; set_map h.
+  Proof.
+    unfold set_map. exact (set_monad_assoc (h ;; set_emb) f).
+  Qed.
+
+  Section SET_KLEISLI.
+    Definition set_kl_compose {X Y Z} (g : Y -> set Z) (f : X -> set Y) : X -> set Z :=
+      f ;; set_ext g.
+
+    Lemma set_kl_compose_id_left {X Y} (f : X -> set Y) :
+      set_kl_compose set_emb f = f.
+    Proof.
+      unfold set_kl_compose. rewrite set_monad_lunital. reflexivity.
+    Qed.
+
+    Lemma set_kl_compose_id_right {X Y} (g : X -> set Y) :
+      set_kl_compose g set_emb = g.
+    Proof.
+      unfold set_kl_compose. rewrite <- (set_monad_runital g). reflexivity.
+    Qed.
+
+    Lemma set_kl_compose_assoc {X Y Z W}
+        (h : Z -> set W) (g : Y -> set Z) (f : X -> set Y) :
+      set_kl_compose h (set_kl_compose g f) = set_kl_compose (set_kl_compose h g) f.
+    Proof.
+      unfold set_kl_compose. rewrite set_monad_assoc. reflexivity.
+    Qed.
+
+    Definition set_kl_emb {X Y} (f : X -> Y) : X -> set Y :=
+      f ;; set_emb.
+
+    Lemma set_kl_compose_emb_l {X Y Z} (f : X -> Y) (α : Y -> set Z) :
+      set_kl_compose α (set_kl_emb f) = f ;; α.
+    Proof.
+      apply functional_extensionality. intros x. apply set_ext_ana.
+    Qed.
+
+    Lemma set_kl_compose_emb_r {X Y Z} (α : X -> set Y) (f : Y -> Z) :
+      set_kl_compose (set_kl_emb f) α = α ;; set_map f.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma set_kl_emb_id {X} :
+      set_kl_emb (id : X -> X) = set_emb.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma set_kl_emb_compose {X Y Z} (g : Y -> Z) (f : X -> Y) :
+      set_kl_emb (f ;; g) = set_kl_compose (set_kl_emb g) (set_kl_emb f).
+    Proof.
+      apply functional_extensionality. intros x. unfold set_kl_compose, set_kl_emb.
+      rewrite set_ext_ana. reflexivity.
+    Qed.
+  End SET_KLEISLI.
+End SET_MONAD.
+
+Notation "{{ e ; x ∈ S }}" := (set_map (fun x => e) S)
+  (at level 0, x ident, e at level 99, S at level 99, format "{{ e ; x ∈ S }}") : set_scope.
+
+(** ** Knaster-Tarki Fixed Point Theorem *)
 Module KTFP.
   Section KTFP.
     Context {L : Type} `{Lsl : SemiLattice L} 

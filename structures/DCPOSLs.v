@@ -51,11 +51,6 @@ Class DCPOSL (L : Type) :=
 Global Existing Instance dcposl_dcpo | 10.
 Global Existing Instance dcposl_sl | 10.
 
-(** The join order of a semilattice is pointed by [lbot]. It gets a low
-  priority so that an unannotated [bot] on a DCPOSL means the [lce] bottom. *)
-Global Instance sl_pointed `{SemiLattice} : Pointed ref | 20 :=
-  {| bot := lbot; bot_lb := lbot_lb |}.
-
 (** The [kc_lce] component of [sup_kcont] in pointwise form *)
 Lemma lsup_mon `{DCPOSL} {K} (u v : K -> L) :
   (forall k, lce (u k) (v k)) -> lce (lsup u) (lsup v).
@@ -900,7 +895,7 @@ Section EM_EMB_EXT.
     - exact (sup_ub (exist (fun q => q = p) p eq_refl)).
   Qed.
 
-  Lemma emb_join_eq (x : convex_set P) :
+  Lemma em_emb_join_eq (x : convex_set P) :
     lsup (fun (p : {p : P | x p}) => em_emb (`p)) = x.
   Proof.
     apply (antisymmetry (R := incl)).
@@ -917,7 +912,7 @@ Section EM_EMB_EXT.
   Proof.
     intros Hemb x.
     transitivity (g (lsup (fun p : {p : P | x p} => em_emb (`p)))).
-    - f_equal. symmetry. apply emb_join_eq.
+    - f_equal. symmetry. apply em_emb_join_eq.
     - rewrite sup_cont. unfold em_ext. f_equal.
       apply functional_extensionality.
       intros [p Hp]. apply Hemb.
@@ -967,14 +962,18 @@ End EM_EMB_EXT.
 
 (** *** Set notations for convex sets *)
 
-Notation "{{-}}" := em_emb.
-Notation "{{ x }}" := (em_emb x) (at level 0, x at level 99, format "{{ x }}").
-Notation "x ⊆ y" := (incl x y) (at level 70, no associativity).
-Notation "x ≤ y" := (em_le x y) (at level 70, no associativity).
+Declare Scope em_scope.
+Delimit Scope em_scope with em.
+Open Scope em_scope.
+
+Notation "{{-}}" := em_emb : em_scope.
+Notation "{{ x }}" := (em_emb x) (at level 0, x at level 99, format "{{ x }}") : em_scope.
+Notation "x ⊆ y" := (incl x y) (at level 70, no associativity) : em_scope.
+Notation "x ≤ y" := (em_le x y) (at level 70, no associativity) : em_scope.
 (** Membership is the underlying predicate of a convex set. The notation is
   attached to the projection [mem] rather than to a bare application, so
   that it only ever prints convex-set membership. *)
-Notation "x ∈ S" := (mem S x) (at level 70, no associativity).
+Notation "x ∈ S" := (mem S x) (at level 70, no associativity) : em_scope.
 
 (** Membership is also inclusion of the singleton. *)
 Lemma em_in_iff `{PartialOrder} (x : P) (S : convex_set P) :
@@ -991,10 +990,10 @@ Definition em_fin `{PartialOrder} (l : list P) : convex_set P :=
   fsup (fun a => In a l) {{-}}.
 
 Notation "{{ x , y , .. , z }}" := (em_fin (cons x (cons y .. (cons z nil) ..)))
-  (at level 0, format "{{ x , y , .. , z }}").
+  (at level 0, format "{{ x , y , .. , z }}") : em_scope.
 
 Notation "{{ x | P }}" := (fsup (fun x => P) {{-}})
-  (at level 0, x at level 99, format "{{ x | P }}").
+  (at level 0, x at level 99, format "{{ x | P }}") : em_scope.
 
 Lemma em_comp_in `{PartialOrder} (Q : P -> Prop) (a : P) :
   Q a -> a ∈ {{ x | Q x }}.
@@ -1519,4 +1518,4 @@ Section EM_RELATIVE_MONAD.
 End EM_RELATIVE_MONAD.
 
 Notation "{{ e ; x ∈ S }}" := (convex_map (fun x => e) S)
-  (at level 0, x ident, e at level 99, S at level 99, format "{{ e ; x ∈ S }}").
+  (at level 0, x ident, e at level 99, S at level 99, format "{{ e ; x ∈ S }}") : em_scope.
