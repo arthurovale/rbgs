@@ -4,15 +4,15 @@ Require Import structures.Posets.
 Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
 Require Import structures.KDCPOs.
-Require Import structures.DCPOSLs.
+Require Export structures.DCPOSLs.
 
 Require Import Stdlib.Lists.List.
 Import ListNotations.
 
 Require Import Stdlib.Logic.FunctionalExtensionality.
 
-Require Import comobj.SilEvents.
-Import SilEvents.
+Require Export comobj.SilEvents.
+Export SilEvents.
 Require Import comobj.LCoalg.
 
 Local Open Scope em_scope.
@@ -44,7 +44,7 @@ Notation "↑ s" := (lift_el s) (at level 9, s at next level) : tsil_scope.
 Notation "↺" := lift_bot : tsil_scope.
 Notation "- a -> t" := (lift_el (a, t))
   (at level 35, a at level 35, t at level 35) : tsil_scope.
-Notation "↺_S" := (bot : S).
+Notation "↺_S" := (bot (R := pref)) : tsil_scope.
 
 Open Scope tsil_scope.
 
@@ -151,6 +151,9 @@ Global Instance T_finitary {E S} `{DCPO S} `{!Finitary (R := lce (P := S))} :
   Finitary (R := lce (P := T E S)) := Tsil_finitary.
 
 Abbreviation SilLTS := lcoalg.
+
+Notation "α ⊢ s - e -> t" := (-e-> t ∈ α s)
+  (at level 70, s at level 35, e at level 35, t at level 35) : tsil_scope.
 
 (** ** Simple Communicating Objects *)
 
