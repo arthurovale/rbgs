@@ -451,7 +451,6 @@ Notation "{{ x | P }}" := (fsup (fun x => P) set_emb)
   (at level 0, x at level 99, format "{{ x | P }}") : set_scope.
 
 Section SET_MONAD.
-  Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
   Local Abbreviation id := (fun x => x).
 
   Lemma set_monad_runital {X Y} (f : X -> set Y) :
@@ -486,17 +485,14 @@ Section SET_MONAD.
   Lemma set_map_id {X} :
     set_map (id : X -> X) = id.
   Proof.
-    unfold set_map. rewrite set_monad_lunital. reflexivity.
+    unfold set_map. rewrite fcomp_id_l, set_monad_lunital. reflexivity.
   Qed.
 
   Lemma set_map_compose {X Y Z} (g : Y -> Z) (f : X -> Y) :
     set_map (f ;; g) = set_map f ;; set_map g.
   Proof.
     unfold set_map.
-    rewrite <- (set_monad_assoc (g ;; set_emb) (f ;; set_emb)).
-    apply f_equal. 
-    change (f ;; (g ;; set_emb) = f ;; (set_emb ;; set_ext (g ;; set_emb))).
-    rewrite <- (set_monad_runital (g ;; set_emb)). reflexivity.
+    rewrite <- set_monad_assoc, !fcomp_assoc, <- set_monad_runital. reflexivity.
   Qed.
 
   Lemma set_map_mon {X Y} (f : X -> Y) :
@@ -521,10 +517,7 @@ Section SET_MONAD.
     set_ext (g ;; f) = set_map g ;; set_ext f.
   Proof.
     unfold set_map.
-    rewrite <- (set_monad_assoc f (g ;; set_emb)).
-    apply f_equal.
-    change (g ;; f = g ;; (set_emb ;; set_ext f)).
-    rewrite <- (set_monad_runital f). reflexivity.
+    rewrite <- set_monad_assoc, fcomp_assoc, <- set_monad_runital. reflexivity.
   Qed.
 
   Lemma set_ext_nat_tgt {X Y Y'} (f : X -> set Y) (h : Y -> Y') :
@@ -562,7 +555,7 @@ Section SET_MONAD.
     Lemma set_kl_compose_emb_l {X Y Z} (f : X -> Y) (α : Y -> set Z) :
       set_kl_compose α (set_kl_emb f) = f ;; α.
     Proof.
-      apply functional_extensionality. intros x. apply set_ext_ana.
+      apply functional_extensionality. intros x. apply (set_ext_ana α (f x)).
     Qed.
 
     Lemma set_kl_compose_emb_r {X Y Z} (α : X -> set Y) (f : Y -> Z) :
@@ -580,7 +573,7 @@ Section SET_MONAD.
     Lemma set_kl_emb_compose {X Y Z} (g : Y -> Z) (f : X -> Y) :
       set_kl_emb (f ;; g) = set_kl_compose (set_kl_emb g) (set_kl_emb f).
     Proof.
-      apply functional_extensionality. intros x. unfold set_kl_compose, set_kl_emb.
+      apply functional_extensionality. intros x. unfold set_kl_compose, set_kl_emb, fcomp.
       rewrite set_ext_ana. reflexivity.
     Qed.
   End SET_KLEISLI.

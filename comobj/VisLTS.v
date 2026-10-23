@@ -25,7 +25,6 @@ Local Open Scope em_scope.
 
 Open Scope tsil_scope.
 
-Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
 Local Abbreviation id := (fun x => x).
 
 (** ** Behaviour Objects *)
@@ -310,7 +309,7 @@ Lemma loud_unique_trans {E S} {Spp : PPoset S} {α : SilLTS E S} {α_vis : VisLT
 Proof.
   intros [H _] [H' _]. apply functional_extensionality. intros s.
   assert (R : forall x : convex_set (Tvis E S), convex_map tsil_tvis (convex_map tvis_tsil x) = x).
-  { intros x. change ((convex_map tvis_tsil ;; convex_map tsil_tvis) x = x).
+  { intros x. apply (fcomp_pt (convex_map tvis_tsil) (convex_map tsil_tvis) id id).
     rewrite <- (convex_map_compose tsil_tvis tvis_tsil (Hg := tsil_tvis_mon)).
     rewrite tvis_tsil_retract, convex_map_id. reflexivity. }
   apply (f_equal (fun h => convex_map tsil_tvis (h s))) in H, H'.
@@ -407,7 +406,7 @@ Section LOUDEN.
     - intros s s' Hs.
       exact (em_ext_mon (vstep g) (Hf := vstep_pc g)
                (α s) (α s') (pc_mon (PreContinuous := SilLTS.trans_pc α) s s' Hs)).
-    - unfold Strict. rewrite (strict_bot (f := SilLTS.trans α)), em_ext_bot. apply vstep_bot.
+    - unfold Strict. unfold fcomp. rewrite (strict_bot (f := SilLTS.trans α)), em_ext_bot. apply vstep_bot.
   Qed.
 
   (** The functional proper is defined on coalgebras directly. *)
@@ -422,7 +421,7 @@ Section LOUDEN.
     Monotonic (Φ_louden α) (lce ++> lce).
   Proof.
     intros g g' Hg. split.
-    - intros s. unfold Φ_louden. cbn [VisLTS.trans]. unfold em_ext.
+    - intros s. unfold Φ_louden. cbn [VisLTS.trans fcomp]. unfold em_ext.
       apply (lsup_mon (H := em_dcposl (P := Tvis E S))).
       intros [p Hp]. apply vstep_mono_l. exact Hg.
     - reflexivity.
@@ -456,23 +455,24 @@ Section LOUDEN.
     apply functional_extensionality. intros [| [e c]]; reflexivity.
   Qed.
 
+  Lemma em_ext_vstep_loud_fn (g : VisLTS E S) :
+    convex_map tvis_tsil ;; em_ext (vstep g) = id.
+  Proof.
+    unfold convex_map.
+    rewrite <- (em_monad_assoc (vstep g) (tvis_tsil ;; {{-}}) (Hg := vstep_mono_r g)).
+    rewrite fcomp_assoc, <- em_monad_runital, vstep_tvis_tsil. apply em_monad_lunital.
+  Qed.
+
   Lemma em_ext_vstep_loud (g : VisLTS E S) (x : convex_set (Tvis E S)) :
     em_ext (vstep g) (convex_map tvis_tsil x) = x.
   Proof.
-    unfold convex_map.
-    etransitivity;
-      [exact (eq_sym (f_equal (fun h => h x)
-                (em_monad_assoc (vstep g) (tvis_tsil ;; {{-}}) (Hg := vstep_mono_r g)))) |].
-    etransitivity; [| exact (f_equal (fun h => h x) em_monad_lunital)].
-    apply (f_equal (fun h => em_ext h x)).
-    apply functional_extensionality. intros t. lazy beta. rewrite em_ext_ana.
-    destruct t as [| [e c]]; reflexivity.
+    exact (f_equal (fun h => h x) (em_ext_vstep_loud_fn g)).
   Qed.
 
   Lemma louden_loud (α : SilLTS E S) (α_vis : VisLTS E S) : loud α α_vis -> louden α = α_vis.
   Proof.
     intros [H Hi]. rewrite <- (μ_louden_fixed α). apply VisLTS.lcoalg_ext.
-    - apply functional_extensionality. intros s. unfold Φ_louden. cbn [VisLTS.trans].
+    - apply functional_extensionality. intros s. unfold Φ_louden. cbn [VisLTS.trans fcomp].
       rewrite <- H. lazy beta. apply em_ext_vstep_loud.
     - symmetry. exact Hi.
   Qed.
@@ -491,7 +491,7 @@ Lemma louden_sil_loop_div {E} : louden (sil_loop E) = vis_div.
 Proof.
   apply antisymmetry.
   - apply TFP.lfp_least_prefixed. split.
-    + intros [| []]; unfold Φ_louden, sil_loop, vis_div; cbn [VisLTS.trans].
+    + intros [| []]; unfold Φ_louden, sil_loop, vis_div; cbn [VisLTS.trans fcomp].
       * rewrite !SilLTS.flat_lcoalg_bot, em_ext_bot. erewrite vstep_div; [apply div_set_bot |].
         apply lift_ppo_bot_eq.
       * rewrite !SilLTS.flat_lcoalg_el, em_ext_ana. reflexivity.

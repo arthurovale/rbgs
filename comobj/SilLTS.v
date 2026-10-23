@@ -48,7 +48,6 @@ Notation "↺_S" := (bot : S).
 
 Open Scope tsil_scope.
 
-Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
 Local Abbreviation id := (fun x => x).
 
 Section TSIL.

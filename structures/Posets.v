@@ -1,6 +1,27 @@
 Require Export coqrel.LogicalRelations.
 Require Import interfaces.ConcreteCategory.
 
+Definition fcomp {A B C} (f : A -> B) (g : B -> C) : A -> C := fun x => g (f x).
+Arguments fcomp {A B C} f g x /.
+Notation "f ;; g" := (fcomp f g) (at level 60, right associativity).
+
+Lemma fcomp_assoc {A B C D} (f : A -> B) (g : B -> C) (h : C -> D) :
+  (f ;; g) ;; h = f ;; (g ;; h).
+Proof. reflexivity. Qed.
+
+Lemma fcomp_id_l {A B} (g : A -> B) : (fun x => x) ;; g = g.
+Proof. reflexivity. Qed.
+
+Lemma fcomp_id_r {A B} (f : A -> B) : f ;; (fun x => x) = f.
+Proof. reflexivity. Qed.
+
+Lemma fcomp_app {A B C} (f : A -> B) (g : B -> C) (x : A) : (f ;; g) x = g (f x).
+Proof. reflexivity. Qed.
+
+Lemma fcomp_pt {A B B' C} (f : A -> B) (g : B -> C) (h : A -> B') (k : B' -> C) :
+  f ;; g = h ;; k -> forall x, g (f x) = k (h x).
+Proof. intros H x. exact (f_equal (fun c => c x) H). Qed.
+
 
 (** * Partially ordered sets *)
 

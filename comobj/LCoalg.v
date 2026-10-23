@@ -19,7 +19,6 @@ Module LCoalg (Lab : Category) (Tfunc : Bifunctor Lab PPoset PPoset).
 
   (** First, we use some definitions to peel through the concrete category interface
     for pointed posets exposing the bare functions. *)
-  Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
   Local Abbreviation id := (fun x => x).
 
   (** A labelled coalgebra requires one to provide a transition shape [T] *)

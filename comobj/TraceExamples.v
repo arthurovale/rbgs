@@ -102,7 +102,7 @@ Proof.
   apply antisymmetry.
   - apply sup_lub. intros [x Hx]. intros s.
     assert (Hb : forall s', x s' ⊆ Φ_traces α1 x s') by exact Hx.
-    unfold Φ_traces, set_kl_compose, set_kl_emb in Hb.
+    unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp in Hb.
     assert (H2 : x ↑s2 ⊆ {{↺%tr}}).
     { etransitivity; [apply Hb |]. unfold α1. rewrite VisLTS.flat_lcoalg_el. lazy beta iota.
       rewrite set_ext_em_emb. cbn [set_Tvis]. rewrite set_ext_ana. reflexivity. }
@@ -140,7 +140,7 @@ Proof.
     + exact H2.
     + exact H3.
   - apply KTFP.gfp_coind. intros s.
-    unfold Φ_traces, set_kl_compose, set_kl_emb.
+    unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp.
     destruct s as [| [| | |]].
     + apply set_in_iff. apply (set_ext_in _ _ ↺).
       * change (↺ = (bot : Tvis ev (lift S1 eq))). symmetry. apply Tvis_bot_eq.
@@ -193,7 +193,7 @@ Proof.
   apply antisymmetry.
   - apply sup_lub. intros [x Hx]. intros s.
     assert (Hb : forall s', x s' ⊆ Φ_traces α2 x s') by exact Hx.
-    unfold Φ_traces, set_kl_compose, set_kl_emb in Hb.
+    unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp in Hb.
     assert (H2 : x ↑t2 ⊆ {{↺%tr}}).
     { etransitivity; [apply Hb |]. unfold α2. rewrite VisLTS.flat_lcoalg_el. lazy beta iota.
       rewrite set_ext_em_emb. cbn [set_Tvis]. rewrite set_ext_ana. reflexivity. }
@@ -236,7 +236,7 @@ Proof.
     + exact H2.
     + exact H3.
   - apply KTFP.gfp_coind. intros s.
-    unfold Φ_traces, set_kl_compose, set_kl_emb.
+    unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp.
     destruct s as [| [| | | |]].
     + apply set_in_iff. apply (set_ext_in _ _ ↺).
       * change (↺ = (bot : Tvis ev (lift S2 eq))). symmetry. apply Tvis_bot_eq.

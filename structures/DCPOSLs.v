@@ -1219,7 +1219,6 @@ Definition em_dcpo_complete `{DCPO} `{!EMComplete P} : DCPO (convex_set P) :=
 (** ** The EM Powerdomain Relative Monad *)
 
 Section EM_RELATIVE_MONAD.
-  Local Notation "f ;; g" := (fun x => g (f x)) (at level 60, right associativity).
   Local Abbreviation id := (fun x => x).
 
   (** The Free(ish) structure defined above defines a monad relative to 
@@ -1317,7 +1316,7 @@ Section EM_RELATIVE_MONAD.
   Lemma convex_map_id {X} {lceX : relation X} {Xpo : PartialOrder lceX} :
     convex_map (id : X -> X) = id.
   Proof.
-    unfold convex_map. rewrite em_monad_lunital. reflexivity.
+    unfold convex_map. rewrite fcomp_id_l, em_monad_lunital. reflexivity.
   Qed.
 
   Lemma convex_map_compose {X Y Z}  {lceX : relation X} {Xpo : PartialOrder lceX}
@@ -1328,9 +1327,7 @@ Section EM_RELATIVE_MONAD.
     unfold convex_map.
     rewrite <- (em_monad_assoc (g ;; {{-}}) (f ;; {{-}})
                   (Hg := fun a b Hab => em_emb_mon _ _ (Hg _ _ Hab))).
-    apply f_equal. 
-    change (f ;; (g ;; {{-}}) = f ;; ({{-}} ;; em_ext (g ;; {{-}}))).
-    rewrite <- (em_monad_runital (g ;; {{-}})). reflexivity.
+    rewrite !fcomp_assoc, <- em_monad_runital. reflexivity.
   Qed.
 
   (** *** Continuity of [convex_map] *)
@@ -1442,9 +1439,7 @@ Section EM_RELATIVE_MONAD.
   Proof.
     unfold convex_map.
     rewrite <- (em_monad_assoc f (g ;; {{-}}) (Hg := Hf)).
-    apply f_equal.
-    change (g ;; f = g ;; ({{-}} ;; em_ext f)).
-    rewrite <- (em_monad_runital f). reflexivity.
+    rewrite fcomp_assoc, <- em_monad_runital. reflexivity.
   Qed.
 
   Lemma em_ext_nat_tgt {X Y Y'} {lceX : relation X} {Xpo : PartialOrder lceX}
@@ -1490,7 +1485,7 @@ Section EM_RELATIVE_MONAD.
       {lceZ : relation Z} {Zpo : PartialOrder lceZ} {Zpt : Pointed lceZ}  
         (f : X -> Y) (α : Y -> convex_set Z) : em_kl_compose α (em_kl_emb f) = f ;; α.
     Proof.
-      apply functional_extensionality. intros x. apply em_ext_ana.
+      apply functional_extensionality. intros x. apply (em_ext_ana α (f x)).
     Qed.
 
     Lemma em_kl_compose_emb_r  {X Y Z} {lceY: relation Y} {Ypo : PartialOrder lceY}
@@ -1511,7 +1506,7 @@ Section EM_RELATIVE_MONAD.
         (g : Y -> Z) (f : X -> Y) :
       em_kl_emb (f ;; g) = em_kl_compose (em_kl_emb g) (em_kl_emb f).
     Proof.
-      apply functional_extensionality. intros x. unfold em_kl_compose, em_kl_emb.
+      apply functional_extensionality. intros x. unfold em_kl_compose, em_kl_emb, fcomp.
       rewrite em_ext_ana. reflexivity.
     Qed.
   End EM_KLEISLI.
