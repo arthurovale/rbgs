@@ -18,6 +18,8 @@ Import SilEvents.
 Require Import comobj.LCoalg.
 Require Import comobj.SilLTS.
 
+Local Open Scope em_scope.
+
 
 (** * The Loudening Operator *)
 

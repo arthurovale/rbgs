@@ -964,7 +964,7 @@ End EM_EMB_EXT.
 
 Declare Scope em_scope.
 Delimit Scope em_scope with em.
-Open Scope em_scope.
+Local Open Scope em_scope.
 
 Notation "{{-}}" := em_emb : em_scope.
 Notation "{{ x }}" := (em_emb x) (at level 0, x at level 99, format "{{ x }}") : em_scope.

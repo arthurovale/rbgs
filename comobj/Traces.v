@@ -378,15 +378,40 @@ Section EXCHANGE_LAW.
 
   Lemma λ_Tvis_set_emb {S} `{PPoset S} :
     Tvis_map id {{-}} ;; λ_Tvis_set = {{-}} :> (Tvis E S -> set (Tvis E S)).
-  Admitted.
+  Proof.
+    apply functional_extensionality. intros [| [e s]]; cbn [Tvis_map λ_Tvis_set].
+    - reflexivity.
+    - exact (set_ext_ana _ s).
+  Qed.
 
   Lemma λ_Tvis_set_ext {S S'} `{PPoset S} `{PPoset S'} (f : S -> set S') :
-    Tvis_map id (set_ext f) ;; λ_Tvis_set = λ_Tvis_set ;; set_ext (Tvis_map id f ;; λ_Tvis_set).
-  Admitted.
+    Tvis_map id (set_ext f) ;; λ_Tvis_set = 
+      λ_Tvis_set ;; set_ext (Tvis_map id f ;; λ_Tvis_set).
+  Proof.
+    apply functional_extensionality. intros t. unfold λ_Tvis_set, Tvis_map.
+    simpl. destruct t as [| [e xs]].
+    - apply set_eq. intros t. split.
+      + intros Ht. unfold set_emb in Ht. subst. unfold set_emb.
+        eexists (exist (fun p => p = ↺) ↺ eq_refl). reflexivity.
+      + intros Ht. destruct Ht as [[p Hp] Ht]. unfold set_emb in Hp.
+        subst. simpl in Ht. assumption.
+    - apply set_eq. intros t. split.
+      + intros Ht. destruct Ht as [[s' [[s Hs] Hfp]] Ht]. simpl in Hfp, Ht.
+        unshelve eexists (exist _ (-e-> s) _).
+        { exists (exist _ s Hs). reflexivity. }
+        exists (exist _ s' Hfp). exact Ht.
+      + intros Ht. destruct Ht as [[u [[s Hs] Hu]] Ht]. simpl in Hu, Ht.
+        unfold set_emb in Hu. subst u. cbn in Ht.
+        destruct Ht as [[s' Hfp] Ht]. simpl in Hfp, Ht.
+        unshelve eexists (exist _ s' _).
+        { exists (exist _ s Hs). exact Hfp. }
+        exact Ht.
+  Qed.
 
   Lemma λ_Tvis_nat {S S'} `{PPoset S} `{PPoset S'} (h : S -> S') :
     Tvis_map id (set_map h) ;; λ_Tvis_set = λ_Tvis_set ;; set_map (Tvis_map id h).
   Admitted.
+
 End EXCHANGE_LAW.
 
 Section TRACES.
@@ -427,7 +452,8 @@ Section TRACES.
     apply set_ext_mon_r. apply set_Tvis_mon. exact Hg.
   Qed.
 
-  Definition traces_at (α : S -> convex_set (Tvis E S)) := KTFP.gfp (Φ_traces α).
+  Definition traces_at (α : S -> convex_set (Tvis E S)) : S -> set (Tr E) := 
+    KTFP.gfp (Φ_traces α).
 
   Definition traces (α : VisLTS E S) : set (Tr E) :=
     em_ext (traces_at α) (VisLTS.init α).

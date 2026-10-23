@@ -4,6 +4,8 @@ Require Import structures.DCPOs.
 Require Import structures.DCPOExtra.
 Require Import structures.DCPOSLs.
 
+Local Open Scope em_scope.
+
 Timeout 5 Fail Definition neg_dcpo := (_ : DCPO _).
 Timeout 5 Fail Definition neg_dcposl := (_ : DCPOSL _).
 Timeout 5 Fail Definition neg_sl := (_ : SemiLattice _).

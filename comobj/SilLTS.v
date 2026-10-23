@@ -15,6 +15,8 @@ Require Import comobj.SilEvents.
 Import SilEvents.
 Require Import comobj.LCoalg.
 
+Local Open Scope em_scope.
+
 (** * Communicating Objects *)
 
 (** ** Transition Shape *)

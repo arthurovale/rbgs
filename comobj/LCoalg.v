@@ -8,6 +8,8 @@ Require Import structures.KDCPOs.
 Require Import structures.DCPOSLs.
 Require Import Stdlib.Logic.ProofIrrelevance.
 
+Local Open Scope em_scope.
+
 (** * Labelled Coalgebras *)
 (** Here we provided a generic interface for labelled coalgebras. *)
 

@@ -11,6 +11,8 @@ Require Import comobj.Traces.
 Require Import Stdlib.Lists.List.
 Import ListNotations.
 
+Local Open Scope em_scope.
+
 Section EM_MEMBERSHIP.
   Context {P : Type} {R : relation P} `{!PartialOrder R}.
   Local Open Scope set_scope.
