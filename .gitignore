@@ -20,3 +20,6 @@ html/
 
 # opam
 _opam
+
+# macOS
+.DS_Store
