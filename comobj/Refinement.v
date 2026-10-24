@@ -12,6 +12,8 @@ Definition refines {E}
   (α : SilLTS E Sα) (β : SilLTS E Sβ) :=
   traces (louden α) ⊆ traces (louden β).
 
+Notation "x ⊒ y" := (refines x y) (at level 70, no associativity).
+
 Lemma refines_refl {E} {Sα : Type} `{DCPO Sα} `{!Finitary (R := lce (P := Sα))}  
   (α : SilLTS E Sα) : refines α α.
 Proof.
@@ -28,4 +30,3 @@ Proof.
   intros Hab Hbc. unfold refines. 
   transitivity (traces (louden β)); assumption.
 Qed.
-

@@ -140,6 +140,7 @@ End TsilF.
 (** ** LTSs with Silent Events *)
 Module SilLTS := LCoalg SilEvents TsilF.
 Import SilLTS.
+Export (hints, coercions) SilLTS.
 
 Local Instance T_dcpo {E S} `{DCPO S} : DCPO (T E S) := Tsil_dcpo.
 Global Hint Extern 1 (DCPO (SilLTS.T _ _)) => simple eapply @T_dcpo : typeclass_instances.
@@ -154,6 +155,10 @@ Abbreviation SilLTS := lcoalg.
 
 Notation "α ⊢ s - e -> t" := (-e-> t ∈ α s)
   (at level 70, s at level 35, e at level 35, t at level 35) : tsil_scope.
+
+#[warnings="-postfix-notation-not-level-1"]
+Notation "α ⊢ s -↺->" := (↺ ∈ α s)
+  (at level 70, s at level 35) : tsil_scope.
 
 (** ** Simple Communicating Objects *)
 
