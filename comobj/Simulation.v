@@ -5,6 +5,8 @@ Require Import coqrel.LogicalRelations.
 Require Import comobj.SilLTS.
 Import SilLTS.
 
+Require Import comobj.VisLTS.
+Require Import comobj.Traces.
 Require Import comobj.Refinement.
 
 Local Open Scope em_scope.
@@ -110,14 +112,29 @@ Section SIM.
     forall sα, sα ∈ init α -> exists sβ, sβ ∈ init β /\ sim_ α β true sα sβ.
 End SIM.
 
+Local Close Scope em_scope.
+Local Open Scope set_scope.
+
 Section CORRECTNESS.
   Context {E : Type}
     {Sα : Type} `{DCPO Sα} `{!Finitary (R := lce (P := Sα))}
-    {Sβ : Type} `{DCPO Sβ} `{!Finitary (R := lce (P := Sβ))}.     
+    {Sβ : Type} `{DCPO Sβ} `{!Finitary (R := lce (P := Sβ))}. 
+
+  Lemma soundness_at {α : SilLTS E Sα} {β : SilLTS E Sβ} {sα : Sα} {sβ : Sβ} : 
+    sim_ α β true sα sβ -> traces_at (louden α) sα ⊆ traces_at (louden β) sβ.
+  Admitted.
 
   Theorem soundness {α : SilLTS E Sα} {β : SilLTS E Sβ} : 
     sim α β -> α ⊒ β.
-  Admitted.
+  Proof.
+    intros Hsim. unfold refines, traces. unfold subset.
+    intros p. intros Hp. destruct Hp as [[sα Hsα]  Hp].
+    unfold sim in Hsim. remember Hsα as Hsα'. clear HeqHsα'. 
+    rewrite louden_init in Hsα. specialize (Hsim sα Hsα).
+    destruct Hsim as [sβ [Hsβ Hsim]]. cbn [proj1_sig] in Hp.
+    unshelve eexists. rewrite <- louden_init in Hsβ. exact (exist _ sβ Hsβ).
+    apply (soundness_at Hsim). assumption.
+  Qed.
   
   Theorem completeness {α : SilLTS E Sα} {β : SilLTS E Sβ} :
     α ⊒ β -> sim α β.
