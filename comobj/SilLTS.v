@@ -1,3 +1,6 @@
+From Coinduction Require Import all.
+Import CoindNotations.
+
 Require Import interfaces.Functor.
 
 Require Import structures.Posets.
@@ -160,9 +163,62 @@ Notation "α ⊢ s - e -> t" := (-e-> t ∈ α s)
 Notation "α ⊢ s -↺->" := (↺ ∈ α s)
   (at level 70, s at level 35) : tsil_scope.
 
+Reserved Notation "α ⊢ s -ɛ*-> t" (at level 70, s at level 35, t at level 35).
+
+Inductive sil_star {E : Type} {Sα : Type} {Sα_po : PPoset Sα}
+  (α : Sα -> convex_set (Tsil E Sα)) : Sα -> Sα -> Prop :=
+| sil_star_nil s : α ⊢ s -ɛ*-> s
+| sil_star_cons s s_mid s' : 
+  α ⊢ s -ɛ-> s_mid -> α ⊢ s_mid -ɛ*-> s' -> α ⊢ s -ɛ*-> s'
+  where "α ⊢ s -ɛ*-> t" := (sil_star α s t) : tsil_scope.
+
+Lemma sil_star_trans {E S} {Spo : PPoset S} {α : S -> convex_set (Tsil E S)} {s1 s2 s3} :
+  α ⊢ s1 -ɛ*-> s2 -> α ⊢ s2 -ɛ*-> s3 -> α ⊢ s1 -ɛ*-> s3.
+Proof.
+  induction 1 as [| s1 sm s2 Hstep _ IH]; intros H23; [exact H23 |].
+  eapply sil_star_cons. apply Hstep. apply IH. apply H23.
+Qed.
+
+Definition sil_plus {E : Type} {Sα : Type} {Sα_po : PPoset Sα}
+  (α : Sα -> convex_set (Tsil E Sα)) : Sα -> Sα -> Prop := 
+  fun s s' => exists s_mid, α ⊢ s -ɛ-> s_mid /\ α ⊢ s_mid -ɛ*-> s'.
+
+Notation "α ⊢ s -ɛ+-> t" := (sil_plus α s t) (at level 70, s at level 35, t at level 35).
+
+Section DIVERGES.
+  Context {E S : Type} {Spp : PPoset S}.
+
+  Program Definition divergesF (α : S -> convex_set(Tsil E S)) : mon (S -> Prop) :=
+    {| body R s :=  (α ⊢ s -↺-> ) \/ exists s', α ⊢ s -ɛ-> s' /\ R s' |}.
+  Next Obligation. firstorder. Qed.
+
+  Definition diverges (α : S -> convex_set(Tsil E S)) : S -> Prop := gfp (divergesF α).
+
+  Definition diverges_unfold {α : S -> convex_set(Tsil E S)} {s} :
+    diverges α s <-> ((α ⊢ s -↺-> ) \/ exists s', α ⊢ s -ɛ-> s' /\ diverges α s').
+  Proof.
+    split.
+    - intro Hdiv. unfold diverges in Hdiv. apply (gfp_fp (divergesF α)) in Hdiv.
+      exact Hdiv.
+    - intro Hdiv. unfold diverges. apply (gfp_fp (divergesF α)).
+      exact Hdiv.
+  Qed.
+End DIVERGES.
+
+Section HULL_STEP.
+  Context {E S : Type} {S_dcpo : DCPO S}.
+
+  Definition hull_step (α : S -> convex_set (Tsil E S)) s e t := 
+    (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t t') /\
+    (diverges α s \/ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t)).
+End HULL_STEP.
+
+Notation "α ⊢ s = e => t" := (hull_step α s e t) (at level 70, s at level 35, t at level 35).
+
 (** ** Simple Communicating Objects *)
 
 (** The communicating object [sil_loop] consists of a single non-diverging
 state [tt] and a silent-loop on it. *)
 Definition sil_loop E : SilLTS E (lift unit eq) :=
   flat_lcoalg (fun s => {{-ɛ-> ↑s}}) (fun _ => True).
+

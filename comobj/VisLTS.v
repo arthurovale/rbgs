@@ -1,3 +1,6 @@
+From Coinduction Require Import all.
+Import CoindNotations.
+
 Require Import interfaces.Category.
 Require Import interfaces.Functor.
 
@@ -433,10 +436,10 @@ Section LOUDEN.
   Definition louden (α : SilLTS E S) : VisLTS E S :=
     TFP.lfp (Φ_louden α) (Hf := Φ_louden_mon α).
 
-  Lemma μ_louden_fixed (α : SilLTS E S) :
-    Φ_louden α (louden α) = louden α.
+  Lemma louden_unfold (α : SilLTS E S) :
+    louden α = Φ_louden α (louden α).
   Proof.
-    apply TFP.lfp_fixed.
+    symmetry. apply TFP.lfp_fixed.
   Qed.
 
   (** ** Basic Facts *)
@@ -444,8 +447,115 @@ Section LOUDEN.
   Lemma louden_init (α : SilLTS E S) :
     VisLTS.init (louden α) = SilLTS.init α.
   Proof.
-    rewrite <- μ_louden_fixed. reflexivity.
+    rewrite louden_unfold. reflexivity.
   Qed.
+
+  Lemma louden_mem_div {α : SilLTS E S} {s} : 
+    louden α ⊢ s -↺-> <-> diverges α s. 
+  Proof.
+    split.
+    - intros Ht. unfold diverges. revert s Ht. coinduction R CH.
+      intros s Ht. rewrite louden_unfold in Ht. simpl. simpl in Ht.
+      rewrite <- Tvis_bot_eq in Ht. apply chull_bot in Ht.
+      destruct Ht as [[t Htrans] Ht]. simpl in Ht.
+      destruct t as [| [e s']]; [left; assumption | ].
+      right. exists s'. destruct e as [e |].
+      + cbn in Ht. exfalso.
+        assert (Hc : (- e -> s') = ↺).
+          { rewrite <- Ht; exact lift_ppo_bot_eq. }
+        discriminate Hc.
+      + split; [assumption |]. cbn in Ht. 
+        apply CH. rewrite <- Tvis_bot_eq. exact Ht.
+    - revert s. unfold louden.
+      apply TFP.lfp_ind. intros I x y Hx HD Hy s Hd.
+      rewrite <- Tvis_bot_eq. eapply em_issup_bot.
+      apply (VisLTS.lcoalg_issup_trans _ HD y Hy s).
+      intros i. apply diverges_unfold in Hd. destruct Hd as [Ht | [t [Ht Hd]]].
+      + apply chull_extensive. exists (exist _ ↺ Ht). 
+        simpl. rewrite <- Tvis_bot_eq. reflexivity.
+      + apply chull_extensive. exists (exist _ (-ɛ-> t) Ht). simpl.
+        specialize (Hx i t Hd). rewrite <- Tvis_bot_eq in Hx. apply Hx.
+  Qed.
+
+  Lemma louden_vis_intro {α : SilLTS E S} {s s_mid s' e} :
+    α ⊢ s -ɛ*-> s_mid -> α ⊢ s_mid -'e-> s' -> louden α ⊢ s -e-> s'.
+  Proof.
+    induction 1 as [s | s s_mid' s_mid Hstep _ IH]; intros Hvis.
+    - rewrite louden_unfold. apply chull_extensive.
+      exists (exist _ (-'e-> s') Hvis). reflexivity.
+    - rewrite louden_unfold. apply chull_extensive.
+      exists (exist _ (-ɛ-> s_mid') Hstep). apply IH. assumption.
+  Qed.
+
+  Lemma louden_vis_elim {α : SilLTS E S} :
+    forall s s' e, louden α ⊢ s -e-> s' ->
+      exists s_mid s'', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> s'' /\ lce s' s''.
+  Proof.
+    unfold louden. apply TFP.lfp_ind. intros I x y Hx HD Hy s s' e Hs.
+    assert (Hne : (-e-> s' : Tvis E S) <> bot).
+    { rewrite Tvis_bot_eq. discriminate. }
+    destruct (VisLTS.lcoalg_issup_trans_mem _ HD y Hy s _ Hs Hne) as [i Hi].
+    simpl in Hi. destruct Hi as [a [c [_ [[[p Hp] Hc] [_ Hac]]]]]. simpl in Hc.
+    destruct p as [| [o t]]; [| destruct o as [e' |]]; simpl in Hc.
+    - subst c. inversion Hac.
+    - subst c. inversion Hac as [| ? ? [He Ht]]; cbn in He, Ht; subst e'.
+      exists s, t. split; [constructor | split; [exact Hp | exact Ht]].
+    - inversion Hac as [| ? [e' t'] [He Ht]]; cbn in He, Ht; subst e' c.
+      destruct (Hx i t t' e Hc) as [s_mid [s'' [Hstar [Hvis Hle]]]].
+      exists s_mid, s''. split; [econstructor; eassumption | split; [exact Hvis |]].
+      transitivity t'; assumption.
+  Qed.
+
+  Lemma louden_vis_lower {α : SilLTS E S} {e} :
+    forall s t, louden α ⊢ s -e-> t ->
+    ~ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t) ->
+    diverges α s.
+  Proof.
+    change (forall s t, louden α ⊢ s -e-> t ->
+      ~ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t) ->
+      gfp (divergesF α) s).
+    coinduction R CH. intros s t Hmem Hno.
+    rewrite louden_unfold in Hmem. simpl in Hmem.
+    destruct Hmem as [a [c [[[p Hp] Ha] [_ [Hat _]]]]]. simpl in Ha.
+    destruct p as [| [o u]]; [| destruct o as [e0 |]]; simpl in Ha.
+    - left. exact Hp.
+    - subst a. inversion Hat as [| ? ? [He Hu]]; cbn in He, Hu; subst e0.
+      exfalso. apply Hno. exists s, u. split; [constructor | split; [exact Hp | exact Hu]].
+    - destruct a as [| [e0 t0]].
+      + right. exists u. split; [exact Hp |].
+        apply (gfp_chain R). exact (proj1 (louden_mem_div (s := u)) Ha).
+      + inversion Hat as [| ? ? [He Ht0]]; cbn in He, Ht0; subst e0.
+        right. exists u. split; [exact Hp |].
+        apply (CH u t0 Ha). intros [s_mid [t' [Hstar [Hvis Hle]]]].
+        apply Hno. exists s_mid, t'.
+        split; [exact (sil_star_cons α s u s_mid Hp Hstar) | split; [exact Hvis |]].
+        transitivity t0; assumption.
+  Qed.
+
+  Lemma louden_mem_vis {α : SilLTS E S} :
+    forall s t e, louden α ⊢ s -e-> t <-> α ⊢ s =e=> t.
+  Proof.
+    intros s t e. split.
+    - intros Hmem. split; [exact (louden_vis_elim s t e Hmem) |].
+      destruct (Classical_Prop.classic
+                  (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t))
+        as [Hlow | Hno].
+      + right. exact Hlow.
+      + left. exact (louden_vis_lower s t Hmem Hno).
+    - intros [[s_mid [t' [Hstar [Hvis Hle]]]] Hlow].
+      pose proof (louden_vis_intro Hstar Hvis) as Hup.
+      destruct Hlow as [Hdiv | [s_mid0 [t0 [Hstar0 [Hvis0 Hle0]]]]].
+      + apply (convexity (louden α s) ↺ (-e-> t) (-e-> t')).
+        * exact (proj2 louden_mem_div Hdiv).
+        * exact Hup.
+        * constructor.
+        * constructor; constructor; [reflexivity | exact Hle].
+      + apply (convexity (louden α s) (-e-> t0) (-e-> t) (-e-> t')).
+        * exact (louden_vis_intro Hstar0 Hvis0).
+        * exact Hup.
+        * constructor; constructor; [reflexivity | exact Hle0].
+        * constructor; constructor; [reflexivity | exact Hle].
+  Qed.      
 
   (** Silencing a loud communicating object does nothing *)
 
@@ -471,7 +581,7 @@ Section LOUDEN.
 
   Lemma louden_loud (α : SilLTS E S) (α_vis : VisLTS E S) : loud α α_vis -> louden α = α_vis.
   Proof.
-    intros [H Hi]. rewrite <- (μ_louden_fixed α). apply VisLTS.lcoalg_ext.
+    intros [H Hi]. rewrite (louden_unfold α). apply VisLTS.lcoalg_ext.
     - apply functional_extensionality. intros s. unfold Φ_louden. cbn [VisLTS.trans fcomp].
       rewrite <- H. lazy beta. apply em_ext_vstep_loud.
     - symmetry. exact Hi.
@@ -484,6 +594,8 @@ Section LOUDEN.
     apply louden_loud. apply VisLTS_to_SilLTS_loud.
   Qed.
 End LOUDEN.
+
+Arguments louden : simpl never.
 
 (** ** Sanity Check: loudening a silent loop yields divergence *)
 
@@ -500,5 +612,5 @@ Proof.
     + intros [| []]; unfold vis_div.
       * rewrite VisLTS.flat_lcoalg_bot. apply bot_lb.
       * rewrite VisLTS.flat_lcoalg_el, <- Tvis_bot_eq, em_emb_bot. apply div_set_bot.
-    + rewrite <- (μ_louden_fixed (sil_loop E)). reflexivity.
+    + rewrite (louden_unfold (sil_loop E)). reflexivity.
 Qed.

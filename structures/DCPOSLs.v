@@ -260,6 +260,12 @@ Section CONVEX_SETS.
     convexity := chull_convexity x;
   |}.
 
+  Lemma chull_bot `{!Pointed R} (x : P -> Prop) : chull x bot -> x bot.
+  Proof.
+    intros [a [c [in_x_a [_ [lce_a_bot _]]]]].
+    rewrite <- (lce_bot_eq a lce_a_bot). exact in_x_a.
+  Qed.
+
   (** The convex hull is a closure operator *)
 
   Lemma chull_extensive (x : P -> Prop) : forall a, x a -> chull x a.
@@ -411,6 +417,25 @@ Section EM_ORDER.
     PartialOrder em_le.
   Proof.
     split; typeclasses eauto.
+  Qed.
+
+  Lemma em_issup_bot {I} (x : I -> convex_set P) (y : convex_set P) :
+    IsSup (R := em_le) x y -> (forall i, x i bot) -> y bot.
+  Proof.
+    intros [Hub Hlub] Hx.
+    set (y' := chull (fun a => y a \/ a = bot)).
+    assert (Hy'y : em_le y' y).
+    { split.
+      - intros a [a' [c [_ [Hc [_ Hac]]]]] Ha.
+        destruct Hc as [Hc | Hc]; [exists c; split; assumption |].
+        exfalso. apply Ha. apply lce_bot_eq. rewrite <- Hc. exact Hac.
+      - intros b Hb. exists b. split; [apply chull_extensive; left; exact Hb | reflexivity]. }
+    assert (Hyy' : em_le y y').
+    { apply Hlub. intros i. split.
+      - intros a Ha Hne. destruct (Hub i) as [Hfw _]. destruct (Hfw a Ha Hne) as [b [Hb Hab]].
+        exists b. split; [apply chull_extensive; left; exact Hb | exact Hab].
+      - intros b _. exists bot. split; [exact (Hx i) | apply bot_lb]. }
+    apply (em_le_incl y' y Hy'y Hyy'). apply chull_extensive. right. reflexivity.
   Qed.
 
   (** The EM order is pointed by [div_set], with no further assumption on [P]. *)
@@ -983,6 +1008,31 @@ Proof.
   - intros Hx. apply Hx. reflexivity.
   - intros Hx a <-. exact Hx.
 Qed.
+
+Section EM_SET_MEMBERSHIP.
+  Context `{PartialOrder}.
+  Local Open Scope set_scope.
+
+  Lemma em_ext_set_mem {Q} (f : P -> set Q) (x : convex_set P) (q : Q) :
+    q ∈ em_ext f x <-> exists a, a ∈ x /\ q ∈ f a.
+  Proof.
+    split.
+    - intros [[a Ha] Hq]. exists a. split; assumption.
+    - intros (a & Ha & Hq). exists (exist _ a Ha). exact Hq.
+  Qed.
+
+  Lemma em_ext_in {Q} (f : P -> set Q) (x : convex_set P) (p : P) (q : Q) :
+    p ∈ x -> q ∈ f p -> q ∈ em_ext f x.
+  Proof.
+    intros Hp Hq. exists (exist _ p Hp). exact Hq.
+  Qed.
+
+  Lemma set_ext_em_emb {Q} (f : P -> set Q) (p : P) :
+    set_ext f (mem (em_emb p)) = f p.
+  Proof.
+    apply set_ext_ana.
+  Qed.
+End EM_SET_MEMBERSHIP.
 
 (** Finite sets and comprehensions are joins of singletons. *)
 

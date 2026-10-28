@@ -443,6 +443,49 @@ Section TRACES.
   Definition traces_at (α : S -> convex_set (Tvis E S)) : S -> set (Tr E) := 
     KTFP.gfp (Φ_traces α).
 
+  Lemma traces_at_unfold (α : S -> convex_set (Tvis E S)) :
+    traces_at α = Φ_traces α (traces_at α).
+  Proof.
+    symmetry. exact (KTFP.gfp_fixed (Φ_traces α) (Hf := Φ_traces_mon α)).
+  Qed.
+
+  Lemma traces_at_mem (α : S -> convex_set (Tvis E S)) (s : S) (p : Tr E) :
+    p ∈ traces_at α s <->
+    exists t, t ∈ α s /\
+      match t with
+      | ↺ => p = ↺%tr
+      | -e-> s' => exists q, q ∈ traces_at α s' /\ p = (e ⋅ q)%tr
+      end.
+  Proof.
+    split.
+    - intros Htr. rewrite traces_at_unfold in Htr.
+      unfold Φ_traces in Htr.
+      rewrite set_kl_compose_emb_r in Htr.
+      unfold set_kl_compose in Htr.
+      rewrite set_ext_nat_tgt in Htr. cbn [fcomp] in Htr.
+      apply set_map_mem in Htr. destruct Htr as (t' & Ht' & ->).
+      apply set_ext_mem in Ht'. destruct Ht' as (t & Ht & Ht').
+      exists t. split; [exact Ht |].
+      destruct t as [| [e s']]; cbn [set_Tvis] in Ht'.
+      + unfold set_emb in Ht'. subst t'. reflexivity.
+      + apply set_map_mem in Ht'. destruct Ht' as (q & Hq & ->).
+        exists q. split; [exact Hq | reflexivity].
+    - intros (t & Ht & Hp). rewrite traces_at_unfold.
+      unfold Φ_traces.
+      rewrite set_kl_compose_emb_r.
+      unfold set_kl_compose.
+      rewrite set_ext_nat_tgt. cbn [fcomp].
+      apply set_map_mem.
+      destruct t as [| [e s']].
+      + subst p. exists ↺. split; [| reflexivity].
+        apply set_ext_mem. exists ↺. split; [exact Ht | reflexivity].
+      + destruct Hp as (q & Hq & ->). exists (-e-> q). split; [| reflexivity].
+        apply set_ext_mem. exists (-e-> s'). split; [exact Ht |].
+        cbn [set_Tvis]. apply set_map_mem. exists q. split; [exact Hq | reflexivity].
+  Qed.    
+
   Definition traces (α : VisLTS E S) : set (Tr E) :=
     em_ext (traces_at α) (VisLTS.init α).
 End TRACES.
+
+Arguments traces_at : simpl never.

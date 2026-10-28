@@ -767,6 +767,8 @@ Section LFP.
   Qed.
 End LFP.
 
+Global Opaque lfp.
+
 (** Unfortunately, in some applications the recursive processes
   we wish to study fail Scott-continuity. This is especially true
   in the context of concurrency and fair scheduling, which involve
@@ -1229,7 +1231,25 @@ Module TFP.
     rauto.
   Qed.
 
+  Lemma lfp_ind (Q : P -> Prop) :
+    (forall I (x : I -> P) y,
+        (forall i, Q (x i)) ->
+        Directed (fun i => f (x i)) ->
+        IsSup (fun i => f (x i)) y ->
+        Q y) ->  Q lfp.
+  Proof.
+    intros HQ.
+    cut (forall α y, Approximant α y -> Q y).
+    { intros H. eapply H. apply aprop. }
+    intros α. induction α as [I α IHα]. intros y (x & Hx & Hy).
+    simpl in x, Hx, Hy. apply (HQ I x y).
+    - intros i. eapply IHα. exact (Hx i).
+    - apply (approx_directed _ _ Hx).
+    - assumption.
+  Qed.
   End TFP.
+
+  Global Opaque lfp.
 End TFP.
 
 (** When [f] is Scott-continuous then the two constructions coincide. *)

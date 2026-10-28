@@ -185,6 +185,35 @@ Section LCOALG_DCPO.
       + exact (dsup_lub (fun i => init (x i)) (init y) (fun i => proj2 (Hy i))).
   Qed.
 
+  Lemma lcoalg_issup_trans {I} (x : I -> lcoalg E S) (Hx : Directed (R := lcoalg_le) x)
+      (y : lcoalg E S) :
+    IsSup (R := lcoalg_le) x y ->
+    forall s, IsSup (R := em_le) (fun i => trans (x i) s) (trans y s).
+  Proof.
+    intros Hy s.
+    assert (Hyd : y = lcoalg_dsup x Hx).
+    { apply (antisymmetry (R := lcoalg_le)).
+      - apply sup_lub. intros i. unshelve eapply sup_ub. 2: apply lcoalg_dsup_issup.
+      - eapply sup_lub. intros i. apply sup_ub. Unshelve. 2: apply lcoalg_dsup_issup.
+    }
+    rewrite Hyd. refine (@dsup_is_sup _ TES_em_dcpo _ (fun i => trans (x i) s) _).
+  Qed.
+
+  Lemma lcoalg_issup_trans_mem {I} (x : I -> lcoalg E S) (Hx : Directed (R := lcoalg_le) x)
+      (y : lcoalg E S) :
+    IsSup (R := lcoalg_le) x y ->
+    forall s a, trans y s a -> a <> bot -> exists i, trans (x i) s a.
+  Proof.
+    intros Hy s a Ha Hne.
+    assert (Hyd : y = lcoalg_dsup x Hx).
+    { apply (antisymmetry (R := lcoalg_le)).
+      - apply sup_lub. intros i. unshelve eapply sup_ub. 2: apply lcoalg_dsup_issup.
+      - eapply sup_lub. intros i. apply sup_ub. Unshelve. 2: apply lcoalg_dsup_issup.
+    }
+    rewrite Hyd in Ha. hnf in Ha. destruct Ha as [_ Hm].
+    destruct (Hm Hne) as [i Hi]. exists i. apply Hi. reflexivity.
+  Qed.
+
   Lemma lcoalg_bot_pc : PreContinuous (RA := pref) (RB := em_le (P := T E S)) (fun _ : S => bot).
   Proof.
     split.

@@ -417,6 +417,26 @@ Section FREE_SL.
       destruct Hemb. assumption.
   Qed.
 
+  Lemma set_ext_mem {P Q} (f : P -> set Q) (x : set P) (q : Q) :
+    set_ext f x q <-> exists a, x a /\ f a q.
+  Proof.
+    split.
+    - intros [[a Ha] Hq]. exists a. split; assumption.
+    - intros (a & Ha & Hq). exists (exist _ a Ha). exact Hq.
+  Qed.
+
+  Lemma set_ext_in {P Q} (f : P -> set Q) (x : set P) (p : P) (q : Q) :
+    x p -> f p q -> set_ext f x q.
+  Proof.
+    intros Hp Hq. exists (exist _ p Hp). exact Hq.
+  Qed.
+
+  Lemma set_ext_lub {P Q} (f : P -> set Q) (x : set P) (y : set Q) :
+    (forall p, x p -> subset (f p) y) -> subset (set_ext f x) y.
+  Proof.
+    intros Hf q [[p Hp] Hq]. exact (Hf p Hp q Hq).
+  Qed.
+
   Definition set_fin {P} (l : list P) : set P :=
     fsup (fun p => In p l) set_emb.
 
@@ -481,6 +501,14 @@ Section SET_MONAD.
 
   Definition set_map {X Y} (f : X -> Y) : set X -> set Y :=
     set_ext (f ;; set_emb).
+
+  Lemma set_map_mem {X Y} (f : X -> Y) (x : set X) (y : Y) :
+    set_map f x y <-> exists a, x a /\ y = f a.
+  Proof.
+    split.
+    - intros [[a Ha] Hy]. exists a. split; assumption.
+    - intros (a & Ha & Hy). exists (exist _ a Ha). exact Hy.
+  Qed.
 
   Lemma set_map_id {X} :
     set_map (id : X -> X) = id.
@@ -620,5 +648,13 @@ Module KTFP.
     Proof.
       intros. apply (sup_at (exist _ x H)). reflexivity.
     Qed.
+
+    Lemma gfp_lub x :
+      (forall c : Candidate, `c <= x) -> gfp <= x.
+    Proof.
+      intros H. apply sup_lub. exact H.
+    Qed.
   End KTFP.
+
+  Global Opaque gfp.
 End KTFP.

@@ -17,18 +17,6 @@ Section EM_MEMBERSHIP.
   Context {P : Type} {R : relation P} `{!PartialOrder R}.
   Local Open Scope set_scope.
 
-  Lemma em_ext_in {Q} (f : P -> set Q) (x : convex_set P) (p : P) (q : Q) :
-    p ∈ x -> q ∈ f p -> q ∈ em_ext f x.
-  Proof.
-    intros Hp Hq. exists (exist _ p Hp). exact Hq.
-  Qed.
-
-  Lemma set_ext_em_emb {Q} (f : P -> set Q) (p : P) :
-    set_ext f (mem (em_emb p)) = f p.
-  Proof.
-    apply set_ext_ana.
-  Qed.
-
   Lemma fsup_emb_antichain (Q : P -> Prop) (p : P) :
     (forall x y, Q x -> Q y -> R x y -> x = y) ->
     p ∈ fsup Q em_emb -> Q p.
@@ -41,18 +29,6 @@ End EM_MEMBERSHIP.
 
 Section SET_MEMBERSHIP.
   Local Open Scope set_scope.
-
-  Lemma set_ext_in {P Q} (f : P -> set Q) (x : set P) (p : P) (q : Q) :
-    p ∈ x -> q ∈ f p -> q ∈ set_ext f x.
-  Proof.
-    intros Hp Hq. exists (exist _ p Hp). exact Hq.
-  Qed.
-
-  Lemma set_ext_lub {P Q} (f : P -> set Q) (x : set P) (y : set Q) :
-    (forall p, p ∈ x -> f p ⊆ y) -> set_ext f x ⊆ y.
-  Proof.
-    intros Hf q [[p Hp] Hq]. exact (Hf p Hp q Hq).
-  Qed.
 
   Lemma set_fin_lub {P} (l : list P) (y : set P) :
     (forall p, In p l -> p ∈ y) -> set_fin l ⊆ y.
@@ -100,7 +76,7 @@ Definition tr1 (s : lift S1 eq) : set (Tr ev) :=
 Lemma traces_at_α1 : traces_at α1 = tr1.
 Proof.
   apply antisymmetry.
-  - apply sup_lub. intros [x Hx]. intros s.
+  - apply KTFP.gfp_lub. intros [x Hx]. intros s.
     assert (Hb : forall s', x s' ⊆ Φ_traces α1 x s') by exact Hx.
     unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp in Hb.
     assert (H2 : x ↑s2 ⊆ {{↺%tr}}).
@@ -191,7 +167,7 @@ Definition tr2 (s : lift S2 eq) : set (Tr ev) :=
 Lemma traces_at_α2 : traces_at α2 = tr2.
 Proof.
   apply antisymmetry.
-  - apply sup_lub. intros [x Hx]. intros s.
+  - apply KTFP.gfp_lub. intros [x Hx]. intros s.
     assert (Hb : forall s', x s' ⊆ Φ_traces α2 x s') by exact Hx.
     unfold Φ_traces, set_kl_compose, set_kl_emb, fcomp in Hb.
     assert (H2 : x ↑t2 ⊆ {{↺%tr}}).
