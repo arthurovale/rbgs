@@ -213,7 +213,7 @@ Section HULL_STEP.
     (diverges α s \/ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t)).
 End HULL_STEP.
 
-Notation "α ⊢ s = e => t" := (hull_step α s e t) (at level 70, s at level 35, t at level 35).
+Notation "α ⊢ s = e => t" := (hull_step α s t) (at level 70, s at level 35, t at level 35).
 
 (** ** Simple Communicating Objects *)
 
