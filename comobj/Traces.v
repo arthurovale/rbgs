@@ -449,17 +449,16 @@ Section TRACES.
     symmetry. exact (KTFP.gfp_fixed (Φ_traces α) (Hf := Φ_traces_mon α)).
   Qed.
 
-  Lemma traces_at_mem (α : S -> convex_set (Tvis E S)) (s : S) (p : Tr E) :
-    p ∈ traces_at α s <->
+  Lemma Φ_traces_mem (α : S -> convex_set (Tvis E S)) (g : S -> set (Tr E)) (s : S) (p : Tr E) :
+    p ∈ Φ_traces α g s <->
     exists t, t ∈ α s /\
       match t with
       | ↺ => p = ↺%tr
-      | -e-> s' => exists q, q ∈ traces_at α s' /\ p = (e ⋅ q)%tr
+      | -e-> s' => exists q, q ∈ g s' /\ p = (e ⋅ q)%tr
       end.
   Proof.
     split.
-    - intros Htr. rewrite traces_at_unfold in Htr.
-      unfold Φ_traces in Htr.
+    - intros Htr. unfold Φ_traces in Htr.
       rewrite set_kl_compose_emb_r in Htr.
       unfold set_kl_compose in Htr.
       rewrite set_ext_nat_tgt in Htr. cbn [fcomp] in Htr.
@@ -470,8 +469,7 @@ Section TRACES.
       + unfold set_emb in Ht'. subst t'. reflexivity.
       + apply set_map_mem in Ht'. destruct Ht' as (q & Hq & ->).
         exists q. split; [exact Hq | reflexivity].
-    - intros (t & Ht & Hp). rewrite traces_at_unfold.
-      unfold Φ_traces.
+    - intros (t & Ht & Hp). unfold Φ_traces.
       rewrite set_kl_compose_emb_r.
       unfold set_kl_compose.
       rewrite set_ext_nat_tgt. cbn [fcomp].
@@ -482,7 +480,33 @@ Section TRACES.
       + destruct Hp as (q & Hq & ->). exists (-e-> q). split; [| reflexivity].
         apply set_ext_mem. exists (-e-> s'). split; [exact Ht |].
         cbn [set_Tvis]. apply set_map_mem. exists q. split; [exact Hq | reflexivity].
-  Qed.    
+  Qed.
+
+  Lemma traces_at_mem (α : S -> convex_set (Tvis E S)) (s : S) (p : Tr E) :
+    p ∈ traces_at α s <->
+    exists t, t ∈ α s /\
+      match t with
+      | ↺ => p = ↺%tr
+      | -e-> s' => exists q, q ∈ traces_at α s' /\ p = (e ⋅ q)%tr
+      end.
+  Proof.
+    split.
+    - intros Ht. rewrite traces_at_unfold in Ht. apply Φ_traces_mem in Ht. assumption.
+    - intros Ht. rewrite traces_at_unfold. apply Φ_traces_mem. assumption.
+  Qed.
+
+  Lemma traces_at_coind (α : S -> convex_set (Tvis E S)) (X : S -> set (Tr E)) :
+    (forall s p, p ∈ X s ->
+      exists t, t ∈ α s /\
+        match t with
+        | ↺ => p = ↺%tr
+        | -e-> s' => exists q, q ∈ X s' /\ p = (e ⋅ q)%tr
+        end) ->
+    forall s p, p ∈ X s -> p ∈ traces_at α s.
+  Proof.
+    intros HX. change (ref (P := S -> set (Tr E)) X (traces_at α)).
+    apply KTFP.gfp_coind. intros s p Hp. apply Φ_traces_mem. apply HX. exact Hp.
+  Qed.
 
   Definition traces (α : VisLTS E S) : set (Tr E) :=
     em_ext (traces_at α) (VisLTS.init α).

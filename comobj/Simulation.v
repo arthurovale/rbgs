@@ -55,10 +55,9 @@ Section SIMF.
 
   Variant simF_ (R : bool -> rel Sα Sβ) : bool -> rel Sα Sβ :=
   | simF_game sα sβ :
-    ((forall e sα', α ⊢ sα -'e-> sα' -> 
+    ((forall e sα', α ⊢ sα =e=> sα' -> 
       (* Chappe uses R←^+ in the visible branch instead *)
-       exists sβ', exists sβ_mid,
-        β ⊢ sβ -ɛ*-> sβ_mid /\ β ⊢ sβ_mid -'e-> sβ' /\ R← sα' sβ')
+       exists sβ', β ⊢ sβ =e=> sβ' /\ R← sα' sβ')
         /\ 
         (forall sα', α ⊢ sα -ɛ-> sα' -> 
           ((exists sβ', β ⊢ sβ -ɛ+-> sβ' /\ R← sα' sβ') 
@@ -75,8 +74,10 @@ Section SIMF.
     intros R R' HR b sα sβ Hsim.
     destruct Hsim as [sα sβ [Hvis [Hsil Hdiv]] | sα sβ Hdp]; constructor.
     - split; [| split].
-      + intros e sα' Hstep. destruct (Hvis e sα' Hstep) as [sβ' [sβ_mid [H1 [H2 H3]]]].
-        exists sβ', sβ_mid. split; [exact H1 | split; [exact H2 | apply HR←; exact H3]].
+      + intros e sα' Hstep. destruct (Hvis e sα' Hstep) as [sβ' [H1 H2]].
+        exists sβ'. split.
+        * assumption.
+        * apply HR←. assumption.
       + intros sα' Hstep. destruct (Hsil sα' Hstep) as [[sβ' [H1 H2]] | [H1 H2]].
         * left. exists sβ'. split; [exact H1 | apply HR←; exact H2].
         * right. split; [apply HR←; exact H1 | apply HR→; exact H2].
@@ -118,7 +119,7 @@ End SIM.
 Local Close Scope em_scope.
 Local Open Scope set_scope.
 
-Section CORRECTNESS.
+Section SOUNDNESS.
   Context {E : Type}
     {Sα : Type} `{Sα_dcpo: DCPO Sα} `{!Finitary (R := lce (P := Sα))}
     {Sβ : Type} `{Sβ_dcpo: DCPO Sβ} `{!Finitary (R := lce (P := Sβ))}. 
@@ -182,17 +183,25 @@ Section CORRECTNESS.
   Lemma soundness_at {α : SilLTS E Sα} {β : SilLTS E Sβ} {sα : Sα} {sβ : Sβ} : 
     sim_ α β true sα sβ -> traces_at (louden α) sα ⊆ traces_at (louden β) sβ.
   Proof.
-    intros Hsim s Hs. apply traces_at_mem. 
-    apply traces_at_mem in Hs.
-    destruct Hs as [s' [Hlouden Hs']]. apply (proj1 sim_unfold) in Hsim.
-    destruct s' as [ | [e sα']].
-    - exists ↺. split; [| exact Hs'].
-      apply louden_mem_div. apply (gfp_fp (simF α β)) in Hsim. 
-      eapply sim_divpres. exact Hsim. 
-      apply louden_mem_div. assumption.
-    - apply louden_vis_elim in Hlouden. destruct Hlouden as [sα_mid [sα_mid' Hl]].
-      simpl in sα_mid'. destruct Hsim as [Hsim | Hsim].
-      +   
+    intros Hsim p Hp.
+    apply (traces_at_coind (louden β)
+      (fun sβ p => exists sα, sim_ α β true sα sβ /\ p ∈ traces_at (louden α) sα));
+      [| exists sα; split; assumption].
+    clear sα sβ Hsim p Hp. intros sβ p (sα & Hsim & Hp).
+    apply traces_at_mem in Hp.
+    destruct Hp as [t [Hlouden Hp]]. apply (proj1 sim_unfold) in Hsim.
+    inversion Hsim as [? ? [Hvis [Hsil Hdiv]] |]; subst.
+    destruct t as [| [e sα']].
+    - exists ↺. split; [| exact Hp].
+      apply louden_mem_div. eapply sim_divpres. apply sim_unfold. exact Hsim.
+      apply louden_mem_div. exact Hlouden.
+    - apply louden_mem_vis in Hlouden.
+      destruct (Hvis e sα' Hlouden) as [sβ' [Hβ HR]].
+      exists (-e-> sβ'). split.
+      + apply louden_mem_vis. assumption.
+      + destruct Hp as [q [Hq ->]]. exists q. split; [| reflexivity].
+        exists sα'. split; assumption.
+  Qed.
 
   Theorem soundness {α : SilLTS E Sα} {β : SilLTS E Sβ} : 
     sim α β -> α ⊒ β.
@@ -204,9 +213,4 @@ Section CORRECTNESS.
     - rewrite louden_init. exact Hsβ.
     - apply (soundness_at Hsim'). exact Hp.
   Qed.
-  
-  Theorem completeness {α : SilLTS E Sα} {β : SilLTS E Sβ} :
-    α ⊒ β -> sim α β.
-  Admitted.
-  
-End CORRECTNESS.
+End SOUNDNESS.

@@ -342,6 +342,56 @@ Proof.
   apply (loud_unique (VisLTS_to_SilLTS_loud α) Lβ). exact (f_equal SilLTS.init H).
 Qed.
 
+Lemma VisLTS_to_SilLTS_mem {E S} {Spp : PPoset S} (α : VisLTS E S) (s : S) (t : Tsil E S) :
+  t ∈ VisLTS_to_SilLTS α s <-> exists b, b ∈ α s /\ t = tvis_tsil b.
+Proof.
+  split.
+  - intros [a [c [[[p Hp] Ha] [[[q Hq] Hc] [Hat Htc]]]]]. cbn in Ha, Hc. subst a c.
+    destruct t as [| [[e |] u]].
+    + exists ↺. split; [| reflexivity].
+      destruct p as [| [e v]]; [exact Hp |]. inversion Hat.
+    + destruct q as [| [e' w]]; [inversion Htc |].
+      inversion Htc as [| ? ? [He Hw]]; subst. cbn in He, Hw. inversion He; subst e'.
+      exists (-e-> u). split; [| reflexivity].
+      destruct p as [| [e'' v]].
+      * apply (convexity (α s) ↺ (-e-> u) (-e-> w) Hp Hq); [constructor |].
+        constructor. split; [reflexivity | exact Hw].
+      * inversion Hat as [| ? ? [He' Hv]]; subst. cbn in He', Hv. inversion He'; subst e''.
+        apply (convexity (α s) (-e-> v) (-e-> u) (-e-> w) Hp Hq);
+          constructor; split; [reflexivity | exact Hv | reflexivity | exact Hw].
+    + destruct q as [| [e' w]]; inversion Htc as [| ? ? [He Hw]]; subst. cbn in He. discriminate He.
+  - intros [b [Hb ->]]. exists (tvis_tsil b), (tvis_tsil b).
+    split; [exists (exist _ b Hb); reflexivity |].
+    split; [exists (exist _ b Hb); reflexivity |].
+    split; reflexivity.
+Qed.
+
+Lemma VisLTS_to_SilLTS_vis {E S} {Spp : PPoset S} (α : VisLTS E S) (s : S) (e : E) (t : S) :
+  VisLTS_to_SilLTS α ⊢ s -'e-> t <-> α ⊢ s -e-> t.
+Proof.
+  split.
+  - intros H. apply VisLTS_to_SilLTS_mem in H.
+    destruct H as [[| [e' u]] [Hb Ht]]; cbn in Ht; [discriminate Ht |].
+    inversion Ht; subst. exact Hb.
+  - intros Hb. apply VisLTS_to_SilLTS_mem. exists (-e-> t). split; [exact Hb | reflexivity].
+Qed.
+
+Lemma VisLTS_to_SilLTS_sil {E S} {Spp : PPoset S} (α : VisLTS E S) (s t : S) :
+  ~ VisLTS_to_SilLTS α ⊢ s -ɛ-> t.
+Proof.
+  intros H. apply VisLTS_to_SilLTS_mem in H.
+  destruct H as [[| [e' u]] [Hb Ht]]; cbn in Ht; discriminate Ht.
+Qed.
+
+Lemma VisLTS_to_SilLTS_div {E S} {Spp : PPoset S} (α : VisLTS E S) (s : S) :
+  VisLTS_to_SilLTS α ⊢ s -↺-> <-> α ⊢ s -↺->.
+Proof.
+  split.
+  - intros H. apply VisLTS_to_SilLTS_mem in H.
+    destruct H as [[| [e' u]] [Hb Ht]]; cbn in Ht; [exact Hb | discriminate Ht].
+  - intros Hb. apply VisLTS_to_SilLTS_mem. exists ↺. split; [exact Hb | reflexivity].
+Qed.
+
 (** ** Visible Steps *)
 
 Section VIS_STEP.
@@ -649,6 +699,14 @@ Section LOUDEN.
   Lemma louden_idem (α : SilLTS E S) : louden (VisLTS_to_SilLTS (louden α)) = louden α.
   Proof.
     apply louden_loud. apply VisLTS_to_SilLTS_loud.
+  Qed.
+  Lemma loud_hull_step {α : VisLTS E S} {s : S} {e : E} {t : S} :
+    VisLTS_to_SilLTS α ⊢ s =e=> t <-> α ⊢ s -e-> t.
+  Proof.
+    pose proof (louden_loud (VisLTS_to_SilLTS α) α (VisLTS_to_SilLTS_loud α)) as Hl.
+    split.
+    - intros H. apply (proj2 louden_mem_vis) in H. rewrite Hl in H. exact H.
+    - intros H. apply (proj1 louden_mem_vis). rewrite Hl. exact H.
   Qed.
 End LOUDEN.
 
