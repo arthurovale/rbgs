@@ -342,6 +342,55 @@ Proof.
   apply (loud_unique (VisLTS_to_SilLTS_loud α) Lβ). exact (f_equal SilLTS.init H).
 Qed.
 
+(** ** Visible Steps *)
+
+Section VIS_STEP.
+  Context {E S : Type} {Spp : PPoset S}.
+
+  Definition vis_step (α : S -> convex_set (Tsil E S)) (s : S) : Tvis E S -> Prop :=
+    fun t =>
+      match t with
+      | ↺ => diverges α s
+      | -e-> t' => exists s_mid, α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t'
+      end.
+
+  Lemma vis_step_sil (α : S -> convex_set (Tsil E S)) {s s'} :
+    α ⊢ s -ɛ-> s' -> forall t, vis_step α s' t -> vis_step α s t.
+  Proof.
+    intros Hs [| [e t]] Ht.
+    - apply diverges_unfold. right. exists s'. split; assumption.
+    - destruct Ht as [s_mid [Hstar Hvis]].
+      exists s_mid. split; [exact (sil_star_cons α s s' s_mid Hs Hstar) | exact Hvis].
+  Qed.
+
+  Lemma vis_step_hull_mem (α : S -> convex_set (Tsil E S)) (s : S) (e : E) (t : S) :
+    chull (vis_step α s) (-e-> t) <->
+    (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ pref t t') /\
+    (diverges α s \/ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ pref t' t)).
+  Proof.
+    split.
+    - intros [a [c [Ha [Hc [Hat Htc]]]]].
+      inversion Htc as [| ? [e' t'] [He Ht]]; cbn in He, Ht; subst e' c.
+      destruct Hc as [s_mid [Hstar Hvis]].
+      split; [exists s_mid, t'; split; [exact Hstar | split; [exact Hvis | exact Ht]] |].
+      destruct a as [| [e0 t0]]; [left; exact Ha |].
+      inversion Hat as [| ? ? [He0 Ht0]]; cbn in He0, Ht0; subst e0.
+      destruct Ha as [s_mid0 [Hstar0 Hvis0]].
+      right. exists s_mid0, t0. split; [exact Hstar0 | split; [exact Hvis0 | exact Ht0]].
+    - intros [[s_mid [t' [Hstar [Hvis Hle]]]] Hlow].
+      destruct Hlow as [Hdiv | [s_mid0 [t0 [Hstar0 [Hvis0 Hle0]]]]].
+      + exists ↺, (-e-> t'). split; [exact Hdiv |].
+        split; [exists s_mid; split; assumption |].
+        split; [constructor | constructor; constructor; [reflexivity | exact Hle]].
+      + exists (-e-> t0), (-e-> t'). split; [exists s_mid0; split; assumption |].
+        split; [exists s_mid; split; assumption |].
+        split; constructor; constructor; [reflexivity | exact Hle0 | reflexivity | exact Hle].
+  Qed.
+End VIS_STEP.
+
+Notation "α ⊢ s = e => t" := (chull (vis_step α s) (-e-> t))
+  (at level 70, s at level 35, e at level 35, t at level 35).
+
 (** ** The Loudening Operator *)
 
 (** We now define an operation that acts like Milner saturation, removing silent steps.
@@ -532,30 +581,38 @@ Section LOUDEN.
         transitivity t0; assumption.
   Qed.
 
-  Lemma louden_mem_vis {α : SilLTS E S} :
-    forall s t e, louden α ⊢ s -e-> t <-> α ⊢ s =e=> t.
+  Lemma vis_step_louden {α : SilLTS E S} {s} :
+    forall t, vis_step α s t -> louden α s t.
   Proof.
-    intros s t e. split.
-    - intros Hmem. split; [exact (louden_vis_elim s t e Hmem) |].
-      destruct (Classical_Prop.classic
-                  (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t))
-        as [Hlow | Hno].
-      + right. exact Hlow.
-      + left. exact (louden_vis_lower s t Hmem Hno).
-    - intros [[s_mid [t' [Hstar [Hvis Hle]]]] Hlow].
-      pose proof (louden_vis_intro Hstar Hvis) as Hup.
-      destruct Hlow as [Hdiv | [s_mid0 [t0 [Hstar0 [Hvis0 Hle0]]]]].
-      + apply (convexity (louden α s) ↺ (-e-> t) (-e-> t')).
-        * exact (proj2 louden_mem_div Hdiv).
-        * exact Hup.
-        * constructor.
-        * constructor; constructor; [reflexivity | exact Hle].
-      + apply (convexity (louden α s) (-e-> t0) (-e-> t) (-e-> t')).
-        * exact (louden_vis_intro Hstar0 Hvis0).
-        * exact Hup.
-        * constructor; constructor; [reflexivity | exact Hle0].
-        * constructor; constructor; [reflexivity | exact Hle].
-  Qed.      
+    intros [| [e t]] Ht.
+    - apply louden_mem_div. exact Ht.
+    - destruct Ht as [s_mid [Hstar Hvis]]. exact (louden_vis_intro Hstar Hvis).
+  Qed.
+
+  Lemma louden_trans_eq {α : SilLTS E S} (s : S) :
+    louden α s = chull (vis_step α s).
+  Proof.
+    apply convex_set_ext. intros t. split.
+    - intros Ht. destruct t as [| [e t]].
+      + apply chull_extensive. apply louden_mem_div. exact Ht.
+      + apply vis_step_hull_mem. split; [exact (louden_vis_elim s t e Ht) |].
+        destruct (Classical_Prop.classic
+                    (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t))
+          as [Hlow | Hno].
+        * right. exact Hlow.
+        * left. exact (louden_vis_lower s t Ht Hno).
+    - intros [a [c [Ha [Hc [Hat Htc]]]]].
+      apply (convexity (louden α s) a t c); [| | exact Hat | exact Htc];
+        apply vis_step_louden; assumption.
+  Qed.
+
+  Lemma louden_mem_vis {α : SilLTS E S} {s t e} :
+    louden α ⊢ s -e-> t <-> α ⊢ s =e=> t.
+  Proof.
+    split; intros H.
+    - rewrite <- louden_trans_eq. exact H.
+    - rewrite louden_trans_eq. exact H.
+  Qed.
 
   (** Silencing a loud communicating object does nothing *)
 

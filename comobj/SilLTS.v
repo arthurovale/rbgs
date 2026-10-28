@@ -205,16 +205,6 @@ Section DIVERGES.
   Qed.
 End DIVERGES.
 
-Section HULL_STEP.
-  Context {E S : Type} {S_dcpo : DCPO S}.
-
-  Definition hull_step (α : S -> convex_set (Tsil E S)) s e t := 
-    (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t t') /\
-    (diverges α s \/ (exists s_mid t', α ⊢ s -ɛ*-> s_mid /\ α ⊢ s_mid -'e-> t' /\ lce t' t)).
-End HULL_STEP.
-
-Notation "α ⊢ s = e => t" := (hull_step α s t) (at level 70, s at level 35, t at level 35).
-
 (** ** Simple Communicating Objects *)
 
 (** The communicating object [sil_loop] consists of a single non-diverging
